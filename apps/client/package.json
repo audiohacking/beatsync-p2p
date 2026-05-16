@@ -9,7 +9,7 @@
     "build:demo": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_DEMO_MODE=1 next build",
     "dev:log": "rm -f ../../logs/client.log && NEXT_TELEMETRY_DISABLED=1 next dev 2>&1 | tee ../../logs/client.log",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
-    "build:pages": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_P2P_MODE=1 NEXT_OUTPUT=export NEXT_PUBLIC_BASE_PATH=/beatsync-p2p next build",
+    "build:pages": "NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_P2P_MODE=1 NEXT_PUBLIC_STATIC_EXPORT=1 NEXT_OUTPUT=export NEXT_PUBLIC_BASE_PATH=/beatsync-p2p next build",
     "pages:404": "node scripts/gh-pages-404.mjs",
     "start": "NEXT_TELEMETRY_DISABLED=1 next start",
     "start:log": "rm -f ../../logs/client.log && NEXT_TELEMETRY_DISABLED=1 next start 2>&1 | tee ../../logs/client.log",

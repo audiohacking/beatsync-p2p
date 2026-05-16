@@ -4,7 +4,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { SOCIAL_LINKS } from "@/constants";
 import { fetchActiveRooms } from "@/lib/api";
 import { IS_P2P_MODE } from "@/lib/p2p";
-import { appPath } from "@/lib/paths";
+import { roomEntryPath } from "@/lib/paths";
 import { generateName } from "@/lib/randomNames";
 import { validateFullRoomId, validatePartialRoomId } from "@/lib/room";
 import { useRoomStore } from "@/store/room";
@@ -48,13 +48,6 @@ export const Join = () => {
     setUsername(generatedName);
   }, [setValue, setUsername]);
 
-  useEffect(() => {
-    const room = new URLSearchParams(window.location.search).get("room");
-    if (room && validateFullRoomId(room)) {
-      router.replace(appPath(`/room/${room}`));
-    }
-  }, [router]);
-
   const { data: numActiveUsers } = useQuery({
     queryKey: ["active-rooms"],
     queryFn: fetchActiveRooms,
@@ -75,7 +68,7 @@ export const Join = () => {
       roomId: data.roomId,
       username,
     });
-    router.push(appPath(`/room/${data.roomId}`));
+    router.push(roomEntryPath(data.roomId));
   };
 
   const handleCreateRoom = () => {
@@ -84,7 +77,7 @@ export const Join = () => {
     // Generate a random 6-digit room ID
     const newRoomId = Math.floor(100000 + Math.random() * 900000).toString();
 
-    router.push(appPath(`/room/${newRoomId}`));
+    router.push(roomEntryPath(newRoomId));
   };
 
   const handleRegenerateName = () => {

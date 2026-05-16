@@ -1,7 +1,7 @@
 "use client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { fetchDiscoverRooms } from "@/lib/api";
-import { appPath } from "@/lib/paths";
+import { roomEntryPath } from "@/lib/paths";
 import { generateName } from "@/lib/randomNames";
 import { cn, extractFileNameFromUrl, getOldestClient } from "@/lib/utils";
 import { useRoomStore } from "@/store/room";
@@ -28,7 +28,7 @@ export const ActiveRooms = () => {
       setUsername(generatedName);
     }
 
-    router.push(appPath(`/room/${roomId}`));
+    router.push(roomEntryPath(roomId));
   };
 
   if (!discoverRooms || discoverRooms.length === 0) {

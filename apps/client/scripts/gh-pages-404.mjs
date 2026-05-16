@@ -13,7 +13,12 @@ const redirectScript = `<!DOCTYPE html>
     (function () {
       var base = ${JSON.stringify(basePath)};
       var path = location.pathname;
-      var roomMatch = path.match(/(?:^|\\/)room\\/(\\d{6})\\/?$/);
+      // Fix accidental double basePath (e.g. /beatsync-p2p/beatsync-p2p/...)
+      if (path.indexOf(base + base) === 0) {
+        location.replace(base + path.slice(base.length) + location.search + location.hash);
+        return;
+      }
+      var roomMatch = path.match(/room\\/(\\d{6})\\/?$/);
       if (roomMatch) {
         location.replace(base + "/?room=" + roomMatch[1]);
         return;

@@ -3,6 +3,7 @@ import type { MetadataRoute } from "next";
 export const dynamic = "force-static";
 
 const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+const iconPath = basePath ? `${basePath}/icon.svg` : "/icon.svg";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -16,7 +17,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#111111",
     icons: [
       {
-        src: "/icon.svg",
+        src: iconPath,
         sizes: "any",
         type: "image/svg+xml",
       },

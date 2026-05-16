@@ -32,6 +32,7 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_PUBLIC_P2P_MODE: "1"
+          NEXT_PUBLIC_STATIC_EXPORT: "1"
           NEXT_OUTPUT: export
           NEXT_PUBLIC_BASE_PATH: /beatsync-p2p
         run: bun run build:pages
