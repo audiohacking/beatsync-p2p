@@ -94,6 +94,13 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       void sendEnvelopeAction(envelope, targetPeerId);
     };
 
+    coordinator.registerSelf({
+      peerId: selfId,
+      clientId,
+      username,
+      isAdmin: true,
+    });
+
     const cached = loadRoomCache(roomCode);
     if (cached) {
       coordinator.applySnapshot(cached);
@@ -102,13 +109,6 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
         coordinator.hydrateLocalConsumer(onServerMessage);
       }
     }
-
-    coordinator.registerSelf({
-      peerId: selfId,
-      clientId,
-      username,
-      isAdmin: true,
-    });
 
     const updatePeers = () => {
       set({ connectedPeerIds: [...peerIds] });
