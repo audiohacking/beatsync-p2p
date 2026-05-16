@@ -16,4 +16,5 @@ logs/
 local/
 
 .vscode/
+.cursor/
 docs/
