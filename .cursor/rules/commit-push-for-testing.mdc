@@ -1,0 +1,14 @@
+---
+description: After bug fixes, commit and push to main so GitHub Pages can be tested
+alwaysApply: true
+---
+
+# Commit and push for testing
+
+After completing a **fix** (bug, routing, P2P, deploy, CI), always **commit and push** to the remote so the user can test on GitHub Pages (`https://audiohacking.github.io/beatsync-p2p/`).
+
+- Do this without being asked again when the fix is done and tests/build pass.
+- Use a clear commit message focused on **why** (one or two sentences).
+- Push to `origin` on the branch the user is working on (usually `main`).
+- Do **not** commit unrelated drive-by changes; do **not** commit secrets (`.env`, credentials).
+- If `git status` is already clean, say so briefly instead of making an empty commit.
