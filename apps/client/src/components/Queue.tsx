@@ -2,6 +2,7 @@ import React from "react";
 import { cn } from "@/lib/utils";
 import { useCanMutate, useGlobalStore } from "@/store/global";
 import { AnimatePresence, motion } from "motion/react";
+import { IS_P2P_MODE } from "@/lib/p2p";
 import LoadDefaultTracksButton from "./LoadDefaultTracksButton";
 import {
   closestCenter,
@@ -103,8 +104,8 @@ export const Queue = ({ className, ...rest }: React.ComponentProps<"div">) => {
               "Loading tracks..."
             ) : canMutate ? (
               <>
-                <div className="text-sm text-neutral-400">No tracks yet</div>
-                <LoadDefaultTracksButton />
+                <motion.div className="text-sm text-neutral-400">No tracks yet — upload audio below</motion.div>
+                {!IS_P2P_MODE && <LoadDefaultTracksButton />}
               </>
             ) : (
               "No tracks available"

@@ -1,111 +1,68 @@
-import {
-  DiscoverRoomsType,
-  GetActiveRoomsType,
-  GetDefaultAudioType,
-  GetUploadUrlType,
-  UploadCompleteResponseType,
-  UploadCompleteType,
-  UploadUrlResponseType,
-} from "@beatsync/shared";
-import axios from "axios";
-import { getApiUrl } from "./urls";
-
-const baseAxios = axios.create({
-  get baseURL() {
-    return getApiUrl();
-  },
-});
+import { IS_P2P_MODE } from "@/lib/p2p";
+import { broadcastLocalTrackToRoom } from "@/p2p/audio/transfer";
+import { saveLocalTrack } from "@/p2p/audio/localTracks";
+import { toP2PTrackUrl } from "@/p2p/audio/urls";
+import { useP2PConnectionStore } from "@/store/p2pConnection";
+import type { DiscoverRoomsType, GetActiveRoomsType, GetDefaultAudioType } from "@beatsync/shared";
+import { ClientActionEnum } from "@beatsync/shared";
+import { nanoid } from "nanoid";
+import { getLocalTrack } from "@/p2p/audio/localTracks";
+import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 
 export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
-  try {
-    // Step 1: Get presigned upload URL from server
-    const uploadUrlRequest: GetUploadUrlType = {
-      roomId: data.roomId,
-      fileName: data.file.name,
-      contentType: data.file.type,
-    };
-
-    const presignedURLResponse = await baseAxios.post<UploadUrlResponseType>(
-      "/upload/get-presigned-url",
-      uploadUrlRequest
-    );
-
-    const { uploadUrl, publicUrl } = presignedURLResponse.data;
-
-    // Step 2: Upload directly to R2 using presigned URL
-    const uploadResponse = await fetch(uploadUrl, {
-      method: "PUT",
-      body: data.file,
-      headers: {
-        "Content-Type": data.file.type,
-      },
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-    }
-
-    // Step 3: Notify server that upload completed successfully
-    const uploadCompleteRequest: UploadCompleteType = {
-      roomId: data.roomId,
-      originalName: data.file.name,
-      publicUrl,
-    };
-
-    await baseAxios.post<UploadCompleteResponseType>("/upload/complete", uploadCompleteRequest);
-
-    return {
-      success: true,
-      publicUrl,
-    };
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.message || "Failed to upload audio file");
-    }
-    throw error;
+  if (!IS_P2P_MODE) {
+    throw new Error("Server upload is disabled in this fork. Use P2P mode.");
   }
+
+  const trackId = nanoid();
+  const url = toP2PTrackUrl(trackId);
+  const record = {
+    trackId,
+    fileName: data.file.name,
+    mimeType: data.file.type || "audio/mpeg",
+    blob: data.file,
+    createdAt: Date.now(),
+  };
+
+  await saveLocalTrack(record);
+
+  useP2PConnectionStore.getState().sendRequest({
+    type: ClientActionEnum.enum.REGISTER_AUDIO_SOURCE,
+    source: { url },
+  });
+
+  const room = useP2PConnectionStore.getState().room;
+  if (room) {
+    void broadcastLocalTrackToRoom(room, record);
+  }
+
+  return { success: true, publicUrl: url };
 };
 
 export const fetchAudio = async (url: string) => {
-  try {
-    // Direct fetch from R2 public URL - zero server bandwidth
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch audio: ${response.statusText}`);
-    }
-
-    return await response.blob();
-  } catch (error) {
-    throw new Error(`Failed to fetch audio: ${error}`);
+  if (isP2PTrackUrl(url)) {
+    const trackId = parseP2PTrackId(url);
+    if (!trackId) throw new Error("Invalid P2P track URL");
+    const record = await getLocalTrack(trackId);
+    if (!record) throw new Error(`Track not available: ${trackId}`);
+    return record.blob;
   }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch audio: ${response.statusText}`);
+  }
+  return await response.blob();
 };
 
-export async function fetchDefaultAudioSources() {
-  try {
-    const response = await fetch(`${getApiUrl()}/default`);
-
-    if (!response.ok) {
-      console.error("Failed to fetch default audio sources:", response.status);
-      return [];
-    }
-
-    const files: GetDefaultAudioType = await response.json();
-    return files;
-  } catch (error) {
-    console.error("Error fetching default audio sources:", error);
-    return [];
-  }
+export async function fetchDefaultAudioSources(): Promise<GetDefaultAudioType> {
+  return [];
 }
 
-export async function fetchActiveRooms() {
-  const response = await fetch(`${getApiUrl()}/active-rooms`);
-  const data: GetActiveRoomsType = await response.json();
-  return data;
+export async function fetchActiveRooms(): Promise<GetActiveRoomsType> {
+  return 0;
 }
 
-export async function fetchDiscoverRooms() {
-  const response = await fetch(`${getApiUrl()}/discover`);
-  const data: DiscoverRoomsType = await response.json();
-  return data;
+export async function fetchDiscoverRooms(): Promise<DiscoverRoomsType> {
+  return [];
 }

@@ -1,41 +1,46 @@
-# Beatsync
+# Beatsync P2P
 
-Beatsync is a high-precision web audio player built for multi-device playback. The official app is [beatsync.gg](https://www.beatsync.gg/).
-
-https://github.com/user-attachments/assets/2aa385a7-2a07-4ab5-80b1-fda553efc57b
-
-## Features
-
-- **Millisecond-accurate synchronization**: Abstracts [NTP-inspired](https://en.wikipedia.org/wiki/Network_Time_Protocol) time synchronization primitives to achieve a high degree of accuracy
-- **Cross-platform**: Works on any device with a modern browser (Chrome recommended for best performance)
-- **Spatial audio:** Allows controlling device volumes through a virtual listening source for interesting sonic effects
-- **Polished interface**: Smooth loading states, status indicators, and all UI elements come built-in
-- **Self-hostable**: Run your own instance with a few commands
-
-
-> [!NOTE]
-> Beatsync is in early development. Mobile support is working, but experimental. Please consider creating an issue or contributing with a PR if you run into problems!
+Multi-device synchronized audio playback in the browser — **peer-to-peer** via [Trystero](https://github.com/dmotz/trystero). No Beatsync server, no cloud audio storage. Tracks live in the browser (IndexedDB) and are shared with peers in the same room.
 
 ## Quickstart
 
-This project uses [Turborepo](https://turbo.build/repo).
-
-Fill in the `.env` file in `apps/client` with the following:
-
-```sh
-NEXT_PUBLIC_API_URL=http://localhost:8080
-NEXT_PUBLIC_WS_URL=ws://localhost:8080/ws
+```bash
+bun install
+bun dev          # http://localhost:3000 — P2P mode (default)
 ```
 
-Run the following commands to start the server and client:
+Join or create a 6-digit room. Upload audio from the queue panel; files are stored locally and synced to other peers over WebRTC.
+
+## Architecture
+
+| Package | Purpose |
+|---------|---------|
+| `apps/client` | Next.js app — Trystero rooms, host peer state, UI |
+| `packages/shared` | Zod schemas for room messages and P2P envelopes |
+
+- **Trystero room id**: `beatsyncp2p-v1-{6-digit-code}`
+- **Host peer**: lowest `selfId` in the room runs scheduling (play/pause, queue, chat, NTP)
+- **Audio URLs**: `p2p://{trackId}` — blobs in IndexedDB, transferred via Trystero `audio-track` action
+
+## Environment
+
+`apps/client/.env`:
 
 ```sh
-bun install          # installs once for all workspaces
-bun dev              # starts both client (:3000) and server (:8080)
+NEXT_TELEMETRY_DISABLED=1
+NEXT_PUBLIC_P2P_MODE=1
 ```
 
-| Directory         | Purpose                                                        |
-| ----------------- | -------------------------------------------------------------- |
-| `apps/server`     | Bun HTTP + WebSocket server                                    |
-| `apps/client`     | Next.js frontend with Tailwind & Shadcn/ui                     |
-| `packages/shared` | Type-safe schemas and functions shared between client & server |
+Set `NEXT_PUBLIC_P2P_MODE=0` only if you are running a legacy server fork (not included in this repo).
+
+## Scripts
+
+```bash
+bun dev              # Next dev (P2P)
+bun run client:p2p     # Same, explicit
+bun run build          # Production build
+bun run --filter client typecheck
+bun run --filter client test
+```
+
+See [P2P_PLAN.md](P2P_PLAN.md) for migration notes and future hardening (TURN, host handoff).

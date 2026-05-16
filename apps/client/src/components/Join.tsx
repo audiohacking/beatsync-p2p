@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { SOCIAL_LINKS } from "@/constants";
 import { fetchActiveRooms } from "@/lib/api";
+import { IS_P2P_MODE } from "@/lib/p2p";
+import { appPath } from "@/lib/paths";
 import { generateName } from "@/lib/randomNames";
 import { validateFullRoomId, validatePartialRoomId } from "@/lib/room";
 import { useRoomStore } from "@/store/room";
@@ -38,19 +40,27 @@ export const Join = () => {
     },
   });
 
+  const router = useRouter();
+
   useEffect(() => {
     // Set a random username when component mounts
     const generatedName = generateName();
     setUsername(generatedName);
   }, [setValue, setUsername]);
 
+  useEffect(() => {
+    const room = new URLSearchParams(window.location.search).get("room");
+    if (room && validateFullRoomId(room)) {
+      router.replace(appPath(`/room/${room}`));
+    }
+  }, [router]);
+
   const { data: numActiveUsers } = useQuery({
     queryKey: ["active-rooms"],
     queryFn: fetchActiveRooms,
-    refetchInterval: 300, // Poll every
+    refetchInterval: IS_P2P_MODE ? false : 300,
+    enabled: !IS_P2P_MODE,
   });
-
-  const router = useRouter();
 
   const onSubmit = (data: JoinFormData) => {
     setIsJoining(true);
@@ -65,7 +75,7 @@ export const Join = () => {
       roomId: data.roomId,
       username,
     });
-    router.push(`/room/${data.roomId}`);
+    router.push(appPath(`/room/${data.roomId}`));
   };
 
   const handleCreateRoom = () => {
@@ -74,7 +84,7 @@ export const Join = () => {
     // Generate a random 6-digit room ID
     const newRoomId = Math.floor(100000 + Math.random() * 900000).toString();
 
-    router.push(`/room/${newRoomId}`);
+    router.push(appPath(`/room/${newRoomId}`));
   };
 
   const handleRegenerateName = () => {
@@ -92,7 +102,7 @@ export const Join = () => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
         >
-          {numActiveUsers && numActiveUsers > 0 ? (
+          {!IS_P2P_MODE && numActiveUsers && numActiveUsers > 0 ? (
             <motion.div
               className="flex items-center gap-1.5 mb-3"
               initial={{ opacity: 0, y: -5 }}
@@ -337,8 +347,7 @@ export const Join = () => {
           </motion.div>
         </motion.div>
 
-        {/* Active Rooms Section */}
-        <ActiveRooms />
+        {!IS_P2P_MODE && <ActiveRooms />}
       </div>
     </motion.div>
   );

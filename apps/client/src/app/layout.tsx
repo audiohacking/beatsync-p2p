@@ -1,9 +1,6 @@
-import { PostHogProvider } from "@/components/PostHogProvider";
 import TQProvider from "@/components/TQProvider";
 import { Toaster } from "@/components/ui/sonner";
-import { IS_DEMO_MODE } from "@/lib/demo";
 import { cn } from "@/lib/utils";
-import { Analytics } from "@vercel/analytics/react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
@@ -47,13 +44,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           "antialiased font-sans selection:bg-primary-800 selection:text-white"
         )}
       >
-        <PostHogProvider>
-          <TQProvider>
-            {children}
-            <Toaster />
-            {!IS_DEMO_MODE && <Analytics />}
-          </TQProvider>
-        </PostHogProvider>
+        <TQProvider>
+          {children}
+          <Toaster />
+        </TQProvider>
       </body>
     </html>
   );

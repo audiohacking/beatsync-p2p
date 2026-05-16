@@ -1,7 +1,7 @@
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { Queue } from "../Queue";
-import { InlineSearch } from "./InlineSearch";
 
 export const Main = () => {
   return (
@@ -12,11 +12,12 @@ export const Main = () => {
       )}
     >
       <motion.div className="p-6 pt-4">
-        {/* <h1 className="text-xl font-semibold mb-8">BeatSync</h1> */}
-        <div className="mb-6">
-          <InlineSearch />
-        </div>
         <Queue className="mb-8" />
+        {IS_P2P_MODE && (
+          <p className="text-xs text-neutral-500 text-center">
+            Audio stays in your browser and is shared peer-to-peer with the room.
+          </p>
+        )}
       </motion.div>
     </motion.div>
   );

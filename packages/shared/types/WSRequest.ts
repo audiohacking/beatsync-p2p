@@ -35,6 +35,7 @@ export const ClientActionEnum = z.enum([
   "REORDER_AUDIO_SOURCES", // Reorder audio sources in the room queue
   "SET_METRONOME", // Toggle metronome on/off for all clients
   "SET_LOW_PASS_FREQ", // Set low-pass filter cutoff frequency
+  "REGISTER_AUDIO_SOURCE", // P2P: register a locally stored track in the room queue
 ]);
 
 export const NTPRequestPacketSchema = z.object({
@@ -161,6 +162,11 @@ export const SetLowPassFreqSchema = z.object({
   freq: z.number().min(LOW_PASS_CONSTANTS.MIN_FREQ).max(LOW_PASS_CONSTANTS.MAX_FREQ),
 });
 
+export const RegisterAudioSourceSchema = z.object({
+  type: z.literal(ClientActionEnum.enum.REGISTER_AUDIO_SOURCE),
+  source: AudioSourceSchema,
+});
+
 export const WSRequestSchema = z.discriminatedUnion("type", [
   PlayActionSchema,
   PauseActionSchema,
@@ -184,6 +190,7 @@ export const WSRequestSchema = z.discriminatedUnion("type", [
   ReorderAudioSourcesSchema,
   SetMetronomeSchema,
   SetLowPassFreqSchema,
+  RegisterAudioSourceSchema,
 ]);
 export type WSRequestType = z.infer<typeof WSRequestSchema>;
 export type PlayActionType = z.infer<typeof PlayActionSchema>;

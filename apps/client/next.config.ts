@@ -1,8 +1,19 @@
 import type { NextConfig } from "next";
 
+const isStaticExport = process.env.NEXT_OUTPUT === "export";
+const basePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").replace(/\/$/, "");
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  ...(isStaticExport ? { output: "export" as const, trailingSlash: true } : {}),
+  ...(basePath
+    ? {
+        basePath,
+        assetPrefix: `${basePath}/`,
+      }
+    : {}),
   images: {
+    unoptimized: isStaticExport,
     remotePatterns: [
       {
         protocol: "https",
@@ -26,8 +37,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // This is required to support PostHog trailing slash API requests
-  skipTrailingSlashRedirect: true,
   allowedDevOrigins: ["local.beatsync.gg"],
 };
 

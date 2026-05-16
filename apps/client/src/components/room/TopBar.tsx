@@ -1,6 +1,7 @@
 "use client";
 import { SOCIAL_LINKS } from "@/constants";
 import { audioContextManager } from "@/lib/audioContextManager";
+import { appPath } from "@/lib/paths";
 import { MAX_NTP_MEASUREMENTS, useGlobalStore } from "@/store/global";
 import { Crown, Hash, Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -34,7 +35,7 @@ export const TopBar = ({ roomId }: TopBarProps) => {
               <Crown className="h-3 w-3 text-green-500" fill="currentColor" />
             </div>
           )}
-          <Link href="/" className="font-medium hover:text-white transition-colors">
+          <Link href={appPath("/")} className="font-medium hover:text-white transition-colors">
             Beatsync
           </Link>
 

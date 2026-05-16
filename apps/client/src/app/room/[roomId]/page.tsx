@@ -3,9 +3,12 @@ import { DEMO_ROOM_ID, IS_DEMO_MODE } from "@/lib/demo";
 import { validateFullRoomId } from "@/lib/room";
 import { redirect } from "next/navigation";
 
-// Force dynamic rendering and disable caching
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+/** Placeholder for static export; real room codes are resolved client-side. */
+export function generateStaticParams() {
+  return [{ roomId: "000000" }];
+}
+
+export const dynamic = "force-static";
 
 export default async function Page({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = await params;

@@ -1,3 +1,4 @@
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { ClientActionEnum, epochNow, NTP_CONSTANTS } from "@beatsync/shared";
 import { sendWSRequest } from "./ws";
 
@@ -50,7 +51,7 @@ export const sendProbePair = (data: {
   nudgeMs: number | undefined;
 }) => {
   const { ws, currentRTT, compensationMs, nudgeMs } = data;
-  if (ws.readyState !== WebSocket.OPEN) {
+  if (!IS_P2P_MODE && ws.readyState !== WebSocket.OPEN) {
     throw new Error("Cannot send NTP request: WebSocket is not open");
   }
 
@@ -72,7 +73,7 @@ export const sendProbePair = (data: {
 
   // Second probe — sent after PROBE_GAP_MS
   setTimeout(() => {
-    if (ws.readyState !== WebSocket.OPEN) return;
+    if (!IS_P2P_MODE && ws.readyState !== WebSocket.OPEN) return;
     sendWSRequest({
       ws,
       request: {

@@ -1,6 +1,7 @@
 "use client";
 
 import { SOCIAL_LINKS } from "@/constants";
+import { appPath } from "@/lib/paths";
 import { MAX_NTP_MEASUREMENTS, useGlobalStore } from "@/store/global";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
@@ -149,7 +150,7 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
           </motion.p>
 
           <motion.a
-            href="/"
+            href={appPath("/")}
             className="mt-4 px-5 py-2 bg-primary text-primary-foreground rounded-full font-medium text-xs tracking-wide cursor-pointer w-full hover:shadow-lg hover:shadow-zinc-50/50 transition-shadow duration-500 text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
