@@ -1293,7 +1293,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const currentUser = clients.find((client) => client.clientId === clientId);
 
       if (!currentUser) {
-        throw new Error(`Current user not found in connected clients: ${clientId}`);
+        console.warn(
+          `[room] Ignoring CLIENT_CHANGE without local user (${clientId}); peers=${clients.map((c) => c.clientId).join(",")}`
+        );
+        return;
       }
 
       // Restore nudge from server once per connection (e.g. after reconnect)

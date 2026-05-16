@@ -30,6 +30,8 @@ import {
 export interface P2PRoomCoordinatorCallbacks {
   getSelfPeerId: () => string;
   getConnectedPeerIds: () => string[];
+  /** Local UI only — never fan out roster snapshots (each peer has its own view). */
+  onLocalClientListChange: (clients: ClientDataType[]) => void;
   broadcast: (envelope: P2PBroadcastEnvelope) => void;
   unicast: (envelope: P2PUnicastEnvelope) => void;
   direct: (envelope: P2PDirectEnvelope) => void;
@@ -126,7 +128,7 @@ export class P2PRoomCoordinator {
 
     this.clients.set(session.clientId, clientData);
     positionClientsInCircle(this.getActiveClients());
-    this.broadcastClientChange();
+    this.notifyLocalClientListChange();
     this.persistCache();
   }
 
@@ -152,7 +154,7 @@ export class P2PRoomCoordinator {
       this.stopSpatialAudio();
     }
 
-    this.broadcastClientChange();
+    this.notifyLocalClientListChange();
     this.persistCache();
   }
 
@@ -224,7 +226,7 @@ export class P2PRoomCoordinator {
         if (client) {
           client.location = payload.location;
           this.clients.set(clientId, client);
-          this.broadcastClientChange();
+          this.notifyLocalClientListChange();
         }
         return;
       }
@@ -302,9 +304,16 @@ export class P2PRoomCoordinator {
     this.respondNtp(envelope.fromPeerId, envelope.payload);
   }
 
-  handleRemoteSync(requesterPeerId: string): void {
-    this.sendJoinSnapshot(requesterPeerId);
-    this.sendStateSnapshotUnicast(requesterPeerId);
+  handleRemoteSync(envelope: P2PRequestEnvelope): void {
+    this.registerPeer({
+      peerId: envelope.fromPeerId,
+      clientId: envelope.clientId,
+      username: envelope.username,
+      isCreator: false,
+      isAdmin: false,
+    });
+    this.sendJoinSnapshot(envelope.fromPeerId);
+    this.sendStateSnapshotUnicast(envelope.fromPeerId);
   }
 
   handleRemoteAudioLoaded(clientId: string): void {
@@ -493,14 +502,8 @@ export class P2PRoomCoordinator {
     });
   }
 
-  private broadcastClientChange(): void {
-    this.callbacks.broadcast({
-      kind: "broadcast",
-      payload: {
-        type: "ROOM_EVENT",
-        event: { type: "CLIENT_CHANGE", clients: this.getActiveClients() },
-      },
-    });
+  private notifyLocalClientListChange(): void {
+    this.callbacks.onLocalClientListChange(this.getActiveClients());
   }
 
   private broadcastAudioSources(): void {
@@ -698,7 +701,7 @@ export class P2PRoomCoordinator {
     if (!client) return;
     client.isAdmin = isAdmin;
     this.clients.set(targetClientId, client);
-    this.broadcastClientChange();
+    this.notifyLocalClientListChange();
   }
 
   private moveClient(clientId: string, position: PositionType): void {
@@ -724,7 +727,7 @@ export class P2PRoomCoordinator {
     list.forEach((c) => this.clients.set(c.clientId, c));
     positionClientsInCircle(list);
     this.broadcastSpatialConfig();
-    this.broadcastClientChange();
+    this.notifyLocalClientListChange();
   }
 
   private startSpatialAudio(): void {

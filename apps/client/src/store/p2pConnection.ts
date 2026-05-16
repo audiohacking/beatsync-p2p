@@ -32,6 +32,34 @@ function getNtpAnchorPeerId(peerIds: string[]): string | null {
 const REMOTE_REQUEST_TYPES = new Set<WSRequestType["type"]>(["NTP_REQUEST", "SYNC"]);
 const FANOUT_REQUEST_TYPES = new Set<WSRequestType["type"]>(["AUDIO_SOURCE_LOADED"]);
 
+/** Every peer applies these so local roster / room state stays aligned (initiator also runs locally). */
+const REPLICATED_REQUEST_TYPES = new Set<WSRequestType["type"]>([
+  "SEND_IP",
+  "SEND_CHAT_MESSAGE",
+  "REGISTER_AUDIO_SOURCE",
+  "DELETE_AUDIO_SOURCES",
+  "REORDER_AUDIO_SOURCES",
+  "SET_GLOBAL_VOLUME",
+  "SET_LOW_PASS_FREQ",
+  "SET_METRONOME",
+  "SET_PLAYBACK_CONTROLS",
+  "SET_ADMIN",
+  "START_SPATIAL_AUDIO",
+  "STOP_SPATIAL_AUDIO",
+  "MOVE_CLIENT",
+  "SET_LISTENING_SOURCE",
+  "REORDER_CLIENT",
+]);
+
+/** Initiator-only: fans out LOAD_AUDIO_SOURCE / SCHEDULED_ACTION broadcasts. */
+const INITIATOR_ONLY_REQUEST_TYPES = new Set<WSRequestType["type"]>([
+  "PLAY",
+  "PAUSE",
+  "SEARCH_MUSIC",
+  "STREAM_MUSIC",
+  "LOAD_DEFAULT_TRACKS",
+]);
+
 interface P2PConnectionState {
   room: TrysteroRoom | null;
   trysteroRoomId: string | null;
@@ -79,9 +107,20 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       void sendEnvelopeAction(envelope, null);
     };
 
+    const deliverLocalRoomMessage = (message: WSResponseType) => {
+      const { onServerMessage } = get();
+      onServerMessage?.(message);
+    };
+
     const coordinator = new P2PRoomCoordinator(roomCode, {
       getSelfPeerId: () => selfId,
       getConnectedPeerIds: () => [...peerIds],
+      onLocalClientListChange: (clients) => {
+        deliverLocalRoomMessage({
+          type: "ROOM_EVENT",
+          event: { type: "CLIENT_CHANGE", clients },
+        });
+      },
       broadcast: (e) => broadcastEnvelope(e),
       unicast: (e) => void sendEnvelopeAction(e, e.toPeerId),
       direct: (e) => void sendEnvelopeAction(e, e.toPeerId),
@@ -104,10 +143,6 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     const cached = loadRoomCache(roomCode);
     if (cached) {
       coordinator.applySnapshot(cached);
-      const { onServerMessage } = get();
-      if (onServerMessage) {
-        coordinator.hydrateLocalConsumer(onServerMessage);
-      }
     }
 
     const updatePeers = () => {
@@ -147,6 +182,10 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     });
 
     queueMicrotask(() => {
+      const { onServerMessage } = get();
+      if (onServerMessage) {
+        coordinator.hydrateLocalConsumer(onServerMessage);
+      }
       if (coordinator.getSnapshotRichness() > 0) {
         coordinator.broadcastStateSnapshot();
       }
@@ -202,6 +241,17 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       return;
     }
 
+    if (REPLICATED_REQUEST_TYPES.has(request.type)) {
+      void coordinator.handleInitiatorRequest(envelope);
+      sendEnvelopeImpl(envelope, null);
+      return;
+    }
+
+    if (INITIATOR_ONLY_REQUEST_TYPES.has(request.type)) {
+      void coordinator.handleInitiatorRequest(envelope);
+      return;
+    }
+
     void coordinator.handleInitiatorRequest(envelope);
   },
 
@@ -238,12 +288,15 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
           coordinator.handleRemoteNtp(envelope);
           return;
         case "SYNC":
-          coordinator.handleRemoteSync(envelope.fromPeerId);
+          coordinator.handleRemoteSync(envelope);
           return;
         case "AUDIO_SOURCE_LOADED":
           coordinator.handleRemoteAudioLoaded(envelope.clientId);
           return;
         default:
+          if (REPLICATED_REQUEST_TYPES.has(envelope.payload.type)) {
+            void coordinator.handleInitiatorRequest(envelope);
+          }
           return;
       }
     }
@@ -251,7 +304,11 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     if (!onServerMessage) return;
 
     if (envelope.kind === "broadcast") {
-      onServerMessage(envelope.payload);
+      const payload = envelope.payload;
+      if (payload.type === "ROOM_EVENT" && payload.event.type === "CLIENT_CHANGE") {
+        return;
+      }
+      onServerMessage(payload);
       return;
     }
 
