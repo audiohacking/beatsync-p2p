@@ -560,11 +560,20 @@ export class P2PRoomCoordinator {
   }
 
   private broadcastAudioSources(): void {
+    const currentAudioSource =
+      this.playbackState.audioSource && this.audioSources.some((s) => s.url === this.playbackState.audioSource)
+        ? this.playbackState.audioSource
+        : undefined;
+
     this.callbacks.broadcast({
       kind: "broadcast",
       payload: {
         type: "ROOM_EVENT",
-        event: { type: "SET_AUDIO_SOURCES", sources: this.audioSources },
+        event: {
+          type: "SET_AUDIO_SOURCES",
+          sources: this.audioSources,
+          currentAudioSource,
+        },
       },
     });
   }

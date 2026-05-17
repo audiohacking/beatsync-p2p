@@ -29,6 +29,7 @@ export const QueueSortableItem = ({
 }) => {
   const getAudioDuration = useGlobalStore((state) => state.getAudioDuration);
   const selectedAudioUrl = useGlobalStore((state) => state.selectedAudioUrl);
+  const playingAudioUrl = useGlobalStore((state) => state.playingAudioUrl);
   const changeAudioSource = useGlobalStore((state) => state.changeAudioSource);
   const broadcastPlay = useGlobalStore((state) => state.broadcastPlay);
   const broadcastPause = useGlobalStore((state) => state.broadcastPause);
@@ -40,8 +41,9 @@ export const QueueSortableItem = ({
     transition,
   };
 
-  const isSelected = selectedAudioUrl === sourceState.source.url;
-  const isPlayingThis = isSelected && isPlaying;
+  const trackUrl = sourceState.source.url;
+  const isSelected = selectedAudioUrl === trackUrl;
+  const isPlayingThis = isPlaying && playingAudioUrl === trackUrl;
   const isLoading = sourceState.status === "loading";
   const isError = sourceState.status === "error";
 
@@ -197,7 +199,7 @@ export const QueueSortableItem = ({
               >
                 {/* Play/Pause button (shown on hover) */}
                 <button className="text-white text-sm hover:scale-110 transition-transform w-full h-full flex items-center justify-center absolute inset-0 opacity-0 group-hover:opacity-100 select-none">
-                  {isSelected && isPlaying ? (
+                  {isPlayingThis ? (
                     <Pause className="fill-current size-3.5 stroke-1" />
                   ) : (
                     <Play className="fill-current size-3.5" />

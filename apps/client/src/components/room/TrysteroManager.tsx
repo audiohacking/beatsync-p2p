@@ -192,10 +192,7 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
       const state = useGlobalStore.getState();
       const entry = state.audioSources.find((s) => s.source.url === url);
       if (entry && (entry.status === "idle" || entry.status === "error" || entry.status === "loading")) {
-        state.handleLoadAudioSource({
-          type: "LOAD_AUDIO_SOURCE",
-          audioSourceToPlay: { url },
-        });
+        state.preloadAudioSource(url);
       }
     };
     window.addEventListener("p2p-track-received", onTrackReceived);

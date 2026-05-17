@@ -105,6 +105,8 @@ interface GlobalStateValues {
   isInitingSystem: boolean;
   hasUserStartedSystem: boolean; // Track if user has clicked "Start System" at least once
   selectedAudioUrl: string;
+  /** Track URL actually playing or paused-at (queue "now playing" indicator). */
+  playingAudioUrl: string;
 
   // Websocket
   socket: WebSocket | null;
@@ -247,6 +249,8 @@ interface GlobalState extends GlobalStateValues {
 
   // Audio source methods
   handleLoadAudioSource: (sources: LoadAudioSourceType) => void;
+  /** Decode/fetch a track for the playlist without changing selection or playback. */
+  preloadAudioSource: (url: string) => void;
   broadcastReorder: (urls: AudioSourceType[]) => void;
 }
 
@@ -262,6 +266,7 @@ const initialState: GlobalStateValues = {
   playbackStartTime: 0,
   playbackOffset: 0,
   selectedAudioUrl: "",
+  playingAudioUrl: "",
 
   // Spatial audio
   isShuffled: false,
@@ -828,7 +833,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
           // Update state and schedule on audio thread (sample-accurate)
           if (data.audioSource !== state.selectedAudioUrl) {
-            set({ selectedAudioUrl: data.audioSource });
+            set({ selectedAudioUrl: data.audioSource, playingAudioUrl: data.audioSource });
           }
           const audioIndex = state.findAudioIndexByUrl(data.audioSource);
           if (audioIndex === null) return;
@@ -850,9 +855,11 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       console.log(`Playing track ${data.audioSource} at ${data.trackTimeSeconds} seconds in ${waitTimeSeconds}`);
 
-      // Update the selected audio ID
+      // Keep selection and "now playing" tied to the scheduled track URL
       if (data.audioSource !== state.selectedAudioUrl) {
-        set({ selectedAudioUrl: data.audioSource });
+        set({ selectedAudioUrl: data.audioSource, playingAudioUrl: data.audioSource });
+      } else if (data.audioSource !== state.playingAudioUrl) {
+        set({ playingAudioUrl: data.audioSource });
       }
 
       // Find the index of the audio to play
@@ -898,6 +905,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
           audioPlayer: { ...get().audioPlayer!, sourceNode: newSourceNode },
           isPlaying: true,
           selectedAudioUrl: data.audioSource,
+          playingAudioUrl: data.audioSource,
           playbackStartTime: startTime,
           playbackOffset: data.trackTimeSeconds,
           duration: audioSourceState.buffer!.duration,
@@ -1266,6 +1274,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       newSourceNode.start(startTime, data.offset);
       console.log("Started playback at offset:", data.offset, "with delay:", data.when, "audio index:", audioIndex);
 
+      const playingUrl = audioSourceState.source.url;
+
       // Update state with the new source node and tracking info
       set((state) => ({
         ...state,
@@ -1274,6 +1284,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
           sourceNode: newSourceNode,
         },
         isPlaying: true,
+        selectedAudioUrl: playingUrl,
+        playingAudioUrl: playingUrl,
         playbackStartTime: startTime,
         playbackOffset: data.offset,
         duration: audioBuffer.duration, // Set the duration
@@ -1636,7 +1648,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         }
 
         // Clear selected track - don't auto-select another
-        set({ selectedAudioUrl: "" });
+        set({ selectedAudioUrl: "", playingAudioUrl: "" });
       }
     },
 
@@ -1794,6 +1806,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     handleLoadAudioSource: ({ audioSourceToPlay }: LoadAudioSourceType) => {
       set({ selectedAudioUrl: audioSourceToPlay.url });
       loadAudioSource(audioSourceToPlay.url);
+    },
+
+    preloadAudioSource: (url) => {
+      void loadAudioSource(url);
     },
   };
 });
