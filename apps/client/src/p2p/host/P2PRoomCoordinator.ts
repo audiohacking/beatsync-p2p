@@ -1,4 +1,5 @@
 import { deleteLocalTrack } from "@/p2p/audio/localTracks";
+import { coerceP2PPlaybackPermissions, isP2PEqualPeerMode, P2P_DEFAULT_PLAYBACK_PERMISSIONS } from "@/p2p/permissions";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 import { ChatManager } from "@/p2p/host/ChatManager";
 import { computeCacheRichness, type RoomCacheSnapshot, saveRoomCache } from "@/p2p/roomCache";
@@ -74,7 +75,9 @@ export class P2PRoomCoordinator {
     serverTimeToExecute: 0,
     trackPositionSeconds: 0,
   };
-  private playbackControlsPermissions: PlaybackControlsPermissionsType = "ADMIN_ONLY";
+  private playbackControlsPermissions: PlaybackControlsPermissionsType = isP2PEqualPeerMode()
+    ? P2P_DEFAULT_PLAYBACK_PERMISSIONS
+    : "ADMIN_ONLY";
   private globalVolume = 1.0;
   private lowPassFreq: number = LOW_PASS_CONSTANTS.MAX_FREQ;
   private isMetronomeEnabled = false;
@@ -183,7 +186,7 @@ export class P2PRoomCoordinator {
   applySnapshot(snapshot: RoomCacheSnapshot): void {
     this.audioSources = [...snapshot.audioSources];
     this.playbackState = { ...snapshot.playbackState };
-    this.playbackControlsPermissions = snapshot.playbackControlsPermissions;
+    this.playbackControlsPermissions = coerceP2PPlaybackPermissions(snapshot.playbackControlsPermissions);
     this.globalVolume = snapshot.globalVolume;
     this.lowPassFreq = snapshot.lowPassFreq;
     this.isMetronomeEnabled = snapshot.isMetronomeEnabled;
@@ -369,6 +372,7 @@ export class P2PRoomCoordinator {
   }
 
   private canMutate(clientId: string): boolean {
+    if (isP2PEqualPeerMode()) return this.clients.has(clientId);
     const client = this.clients.get(clientId);
     if (!client) return false;
     return this.playbackControlsPermissions === PlaybackControlsPermissionsEnum.enum.EVERYONE || client.isAdmin;
@@ -720,7 +724,7 @@ export class P2PRoomCoordinator {
   }
 
   private setPlaybackControls(permissions: PlaybackControlsPermissionsType): void {
-    this.playbackControlsPermissions = permissions;
+    this.playbackControlsPermissions = coerceP2PPlaybackPermissions(permissions);
     this.callbacks.broadcast({
       kind: "broadcast",
       payload: {

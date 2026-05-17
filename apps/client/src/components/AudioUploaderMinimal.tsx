@@ -93,7 +93,7 @@ export const AudioUploaderMinimal = () => {
       onDragLeave={onDragLeave}
       onDragEnd={onDragLeave}
       onDrop={onDropEvent}
-      title={isDisabled ? "Admin-only mode - only admins can upload" : undefined}
+      title={isDisabled ? "Only hosts with permission can upload in this room" : undefined}
     >
       <label htmlFor="audio-upload" className={cn("block w-full", isDisabled ? "" : "cursor-pointer")}>
         <div className="p-3 flex items-center gap-3">
@@ -111,7 +111,7 @@ export const AudioUploaderMinimal = () => {
             </div>
             {!isUploading && !fileName && (
               <div className={cn("text-xs truncate", isDisabled ? "text-neutral-500" : "text-neutral-400")}>
-                {isDisabled ? "Must be an admin to upload" : "Add MP3 or audio to queue"}
+                {isDisabled ? "Upload not available" : "Add MP3 or audio to queue"}
               </div>
             )}
           </div>

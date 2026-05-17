@@ -1,5 +1,6 @@
 "use client";
 
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/store/global";
 import { sendWSRequest } from "@/utils/ws";
@@ -11,6 +12,8 @@ export const PlaybackPermissions = () => {
   const currentUser = useGlobalStore((state) => state.currentUser);
   const socket = useGlobalStore((state) => state.socket);
   const playbackControlsPermissions = useGlobalStore((state) => state.playbackControlsPermissions);
+
+  if (IS_P2P_MODE) return null;
 
   // Only show if socket is connected
   if (!socket) {

@@ -4,6 +4,7 @@ import { getClientId } from "@/lib/clientId";
 import { getKickBuffer } from "@/components/dashboard/Metronome";
 import { IS_DEMO_MODE } from "@/lib/demo";
 import { IS_P2P_MODE } from "@/lib/p2p";
+import { coerceP2PPlaybackPermissions, P2P_DEFAULT_PLAYBACK_PERMISSIONS } from "@/p2p/permissions";
 import { getLocalTrack } from "@/p2p/audio/localTracks";
 import { reconcileP2PAudioSources } from "@/p2p/audio/availableSources";
 import { loadP2PTrackArrayBuffer } from "@/p2p/audio/transfer";
@@ -292,7 +293,9 @@ const initialState: GlobalStateValues = {
   },
 
   // Playback controls
-  playbackControlsPermissions: PlaybackControlsPermissionsEnum.enum.ADMIN_ONLY,
+  playbackControlsPermissions: IS_P2P_MODE
+    ? P2P_DEFAULT_PLAYBACK_PERMISSIONS
+    : PlaybackControlsPermissionsEnum.enum.ADMIN_ONLY,
 
   // Search results
   searchResults: null,
@@ -413,6 +416,8 @@ const initializationMutex = new Mutex();
 export const useCanMutate = () => {
   const currentUser = useGlobalStore((state) => state.currentUser);
   const playbackControlsPermissions = useGlobalStore((state) => state.playbackControlsPermissions);
+
+  if (IS_P2P_MODE) return true;
 
   const isAdmin = currentUser?.isAdmin || false;
   const isEveryoneMode = playbackControlsPermissions === PlaybackControlsPermissionsEnum.enum.EVERYONE;
@@ -1618,7 +1623,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       initializeAudioExclusively();
     },
     setReconnectionInfo: (info) => set({ reconnectionInfo: info }),
-    setPlaybackControlsPermissions: (permissions) => set({ playbackControlsPermissions: permissions }),
+    setPlaybackControlsPermissions: (permissions) =>
+      set({ playbackControlsPermissions: coerceP2PPlaybackPermissions(permissions) }),
 
     // Search methods
     setSearchResults: (results, append = false) => {

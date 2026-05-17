@@ -1,4 +1,6 @@
+import { P2P_DEFAULT_PLAYBACK_PERMISSIONS } from "@/p2p/permissions";
 import type { AudioSourceType, ChatMessageType, PlaybackControlsPermissionsType } from "@beatsync/shared";
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { LOW_PASS_CONSTANTS } from "@beatsync/shared";
 
 export interface RoomPlaybackStateCache {
@@ -72,7 +74,7 @@ export function createEmptyRoomCache(): RoomCacheSnapshot {
       serverTimeToExecute: 0,
       trackPositionSeconds: 0,
     },
-    playbackControlsPermissions: "ADMIN_ONLY",
+    playbackControlsPermissions: IS_P2P_MODE ? P2P_DEFAULT_PLAYBACK_PERMISSIONS : "ADMIN_ONLY",
     globalVolume: 1,
     lowPassFreq: LOW_PASS_CONSTANTS.MAX_FREQ,
     isMetronomeEnabled: false,

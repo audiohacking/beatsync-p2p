@@ -1,4 +1,5 @@
 import type { AudioSourceType } from "@beatsync/shared";
+import { coerceP2PPlaybackPermissions } from "@/p2p/permissions";
 import { getLocalTrack } from "@/p2p/audio/localTracks";
 import type { RoomCacheSnapshot, RoomPlaybackStateCache } from "@/p2p/roomCache";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
@@ -63,5 +64,6 @@ export async function prepareRoomCacheSnapshot(
     ...snapshot,
     audioSources,
     playbackState: sanitizePlaybackStateForSources(snapshot.playbackState, audioSources),
+    playbackControlsPermissions: coerceP2PPlaybackPermissions(snapshot.playbackControlsPermissions),
   };
 }
