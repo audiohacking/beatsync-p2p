@@ -24,13 +24,8 @@ export const getUserLocation = async (): Promise<z.infer<typeof LocationSchema>>
     return cachedLocation;
   }
 
-  const locationServices = [
-    getUserLocationGeoJS,
-    getUserLocationIPAPICo,
-    getUserLocationCountryIs,
-    getUserLocationKameroGeo,
-    getUserLocationIPWhoIs,
-  ];
+  // CORS-friendly providers only (country.is / ipwho / ipapi often fail on GitHub Pages).
+  const locationServices = [getUserLocationGeoJS, getUserLocationKameroGeo];
 
   const results = await Promise.allSettled(locationServices.map((service) => service()));
 

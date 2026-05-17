@@ -88,16 +88,21 @@ export class P2PRoomCoordinator {
   ) {}
 
   registerSelf(session: Omit<PeerSession, "isCreator" | "isAdmin"> & { isCreator?: boolean; isAdmin?: boolean }): void {
-    this.registerPeer({
-      peerId: session.peerId,
-      clientId: session.clientId,
-      username: session.username,
-      isCreator: session.isCreator ?? false,
-      isAdmin: session.isAdmin ?? true,
-    });
+    this.registerPeer(
+      {
+        peerId: session.peerId,
+        clientId: session.clientId,
+        username: session.username,
+        isCreator: session.isCreator ?? false,
+        isAdmin: session.isAdmin ?? true,
+      },
+      { notify: false }
+    );
   }
 
-  registerPeer(session: PeerSession): void {
+  registerPeer(session: PeerSession, options: { notify?: boolean } = {}): void {
+    const shouldNotify = options.notify !== false;
+
     if (this.peerSessions.has(session.peerId)) {
       const existing = this.peerSessions.get(session.peerId)!;
       if (session.username) existing.username = session.username;
@@ -128,7 +133,9 @@ export class P2PRoomCoordinator {
 
     this.clients.set(session.clientId, clientData);
     positionClientsInCircle(this.getActiveClients());
-    this.notifyLocalClientListChange();
+    if (shouldNotify) {
+      this.notifyLocalClientListChange();
+    }
     this.persistCache();
   }
 

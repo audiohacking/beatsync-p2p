@@ -112,6 +112,16 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       onServerMessage?.(message);
     };
 
+    const deliverEnvelope = (envelope: P2PEnvelope, targetPeerId: string | null) => {
+      if (targetPeerId === selfId) {
+        if (envelope.kind === "unicast" || envelope.kind === "direct") {
+          deliverLocalRoomMessage(envelope.payload);
+        }
+        return;
+      }
+      void sendEnvelopeAction(envelope, targetPeerId);
+    };
+
     const coordinator = new P2PRoomCoordinator(roomCode, {
       getSelfPeerId: () => selfId,
       getConnectedPeerIds: () => [...peerIds],
@@ -122,10 +132,10 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
         });
       },
       broadcast: (e) => broadcastEnvelope(e),
-      unicast: (e) => void sendEnvelopeAction(e, e.toPeerId),
-      direct: (e) => void sendEnvelopeAction(e, e.toPeerId),
+      unicast: (e) => deliverEnvelope(e, e.toPeerId),
+      direct: (e) => deliverEnvelope(e, e.toPeerId),
       stateSnapshot: (targetPeerId, envelope) => {
-        void sendEnvelopeAction(envelope, targetPeerId);
+        deliverEnvelope(envelope, targetPeerId);
       },
     });
 
@@ -181,16 +191,17 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       connectedPeerIds: [...peerIds],
     });
 
-    queueMicrotask(() => {
+    const flushLocalRoomState = () => {
       const { onServerMessage } = get();
-      if (onServerMessage) {
-        coordinator.hydrateLocalConsumer(onServerMessage);
-      }
+      if (!onServerMessage) return;
+      coordinator.hydrateLocalConsumer(onServerMessage);
       if (coordinator.getSnapshotRichness() > 0) {
         coordinator.broadcastStateSnapshot();
       }
       get().sendRequest({ type: "SYNC" });
-    });
+    };
+
+    queueMicrotask(flushLocalRoomState);
   },
 
   disconnect: () => {

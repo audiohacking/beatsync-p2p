@@ -28,7 +28,6 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
   const schedulePlay = useGlobalStore((state) => state.schedulePlay);
   const schedulePause = useGlobalStore((state) => state.schedulePause);
   const processSpatialConfig = useGlobalStore((state) => state.processSpatialConfig);
-  const isSpatialAudioEnabled = useGlobalStore((state) => state.isSpatialAudioEnabled);
   const setIsSpatialAudioEnabled = useGlobalStore((state) => state.setIsSpatialAudioEnabled);
   const processStopSpatialAudio = useGlobalStore((state) => state.processStopSpatialAudio);
   const processGlobalVolumeConfig = useGlobalStore((state) => state.processGlobalVolumeConfig);
@@ -70,7 +69,9 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
       schedulePause,
       processSpatialConfig,
       setIsSpatialAudioEnabled,
-      isSpatialAudioEnabled,
+      get isSpatialAudioEnabled() {
+        return useGlobalStore.getState().isSpatialAudioEnabled;
+      },
       processStopSpatialAudio,
       processGlobalVolumeConfig,
       processLowPassConfig,
@@ -103,7 +104,6 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
       schedulePlay,
       schedulePause,
       processSpatialConfig,
-      isSpatialAudioEnabled,
       setIsSpatialAudioEnabled,
       processStopSpatialAudio,
       processGlobalVolumeConfig,
@@ -140,7 +140,9 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
             location,
           });
         })
-        .catch((e) => console.error("Failed to geolocate IP", e));
+        .catch(() => {
+          console.warn("[P2P] Geolocation unavailable; continuing without location");
+        });
     }
 
     return () => {

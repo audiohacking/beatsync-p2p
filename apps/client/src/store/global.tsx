@@ -1299,9 +1299,22 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         return;
       }
 
+      const state = get();
+      const rosterKey = (list: ClientDataType[]) =>
+        list
+          .map(
+            (c) =>
+              `${c.clientId}:${c.username}:${c.isAdmin}:${c.isCreator}:${c.position.x},${c.position.y}:${c.rtt}:${c.nudgeMs}`
+          )
+          .sort()
+          .join("|");
+
+      if (rosterKey(state.connectedClients) === rosterKey(clients) && state.currentUser?.clientId === clientId) {
+        return;
+      }
+
       // Restore nudge from server once per connection (e.g. after reconnect)
-      const { didRestoreNudge } = get();
-      const shouldRestoreNudge = !didRestoreNudge && currentUser.nudgeMs !== 0;
+      const shouldRestoreNudge = !state.didRestoreNudge && currentUser.nudgeMs !== 0;
 
       set({
         connectedClients: clients,
