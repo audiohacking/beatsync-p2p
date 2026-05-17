@@ -3,7 +3,7 @@
 import { joinRoom } from "trystero";
 
 type TrysteroRoom = ReturnType<typeof joinRoom>;
-import { initP2PAudioTransfer } from "@/p2p/audio/transfer";
+import { initP2PAudioTransfer, pushLocalTracksToPeer, resetP2PAudioTransfer } from "@/p2p/audio/transfer";
 import { P2PRoomCoordinator } from "@/p2p/host/P2PRoomCoordinator";
 import { parseP2PEnvelope } from "@/p2p/protocol";
 import { toTrysteroRoomId } from "@/p2p/constants";
@@ -16,6 +16,7 @@ import {
 } from "@/p2p/roomCache";
 import type { P2PEnvelope, P2PRequestEnvelope, WSRequestType, WSResponseType } from "@beatsync/shared";
 import { selfId } from "trystero";
+import { useGlobalStore } from "@/store/global";
 import { create } from "zustand";
 
 interface P2PSession {
@@ -183,6 +184,8 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       peerIds.add(peerId);
       set({ connectedPeerIds: [...peerIds] });
       coordinator.onPeerJoined(peerId);
+      const playlistUrls = useGlobalStore.getState().audioSources.map((as) => as.source.url);
+      void pushLocalTracksToPeer(peerId, playlistUrls);
     });
 
     room.onPeerLeave((peerId) => {
@@ -219,6 +222,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
   detachSession: () => {
     const { coordinator } = get();
     coordinator?.destroy();
+    resetP2PAudioTransfer();
     sendEnvelopeImpl = null;
     attachedRoom = null;
     set({

@@ -1268,10 +1268,17 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     pauseAudio: (data: { when: number }) => {
       const state = get();
+      if (!state.audioPlayer) return;
+
       const { sourceNode, audioContext } = getAudioPlayer(state);
 
       const stopTime = audioContext.currentTime + data.when;
-      sourceNode.stop(stopTime);
+      try {
+        sourceNode.stop(stopTime);
+      } catch {
+        // Buffer source may never have been started (e.g. track still loading)
+        return;
+      }
 
       // Calculate current position in the track at the time of pausing
       const elapsedSinceStart = stopTime - state.playbackStartTime;
@@ -1296,11 +1303,21 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     setConnectedClients: (clients) => {
       const clientId = getClientId();
-      const currentUser = clients.find((client) => client.clientId === clientId);
+      let roster = clients;
+
+      // Remote join snapshots may list only peers the sender knows — keep ourselves in the roster.
+      if (IS_P2P_MODE && !roster.some((c) => c.clientId === clientId)) {
+        const self = get().currentUser;
+        if (self?.clientId === clientId) {
+          roster = [...roster, self];
+        }
+      }
+
+      const currentUser = roster.find((client) => client.clientId === clientId);
 
       if (!currentUser) {
         console.warn(
-          `[room] Ignoring CLIENT_CHANGE without local user (${clientId}); peers=${clients.map((c) => c.clientId).join(",")}`
+          `[room] Ignoring CLIENT_CHANGE without local user (${clientId}); peers=${roster.map((c) => c.clientId).join(",")}`
         );
         return;
       }
@@ -1315,7 +1332,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
           .sort()
           .join("|");
 
-      if (rosterKey(state.connectedClients) === rosterKey(clients) && state.currentUser?.clientId === clientId) {
+      if (rosterKey(state.connectedClients) === rosterKey(roster) && state.currentUser?.clientId === clientId) {
         return;
       }
 
@@ -1323,7 +1340,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const shouldRestoreNudge = !state.didRestoreNudge && currentUser.nudgeMs !== 0;
 
       set({
-        connectedClients: clients,
+        connectedClients: roster,
         currentUser,
         ...(shouldRestoreNudge ? { nudgeOffsetMs: currentUser.nudgeMs, didRestoreNudge: true } : {}),
       });

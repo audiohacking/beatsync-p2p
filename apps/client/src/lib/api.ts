@@ -1,13 +1,12 @@
 import { normalizeAudioMimeType } from "@/lib/audioFormats";
 import { IS_P2P_MODE } from "@/lib/p2p";
-import { broadcastLocalTrackToRoom } from "@/p2p/audio/transfer";
+import { broadcastLocalTrackToRoom, ensureP2PTrackLocal } from "@/p2p/audio/transfer";
 import { saveLocalTrack } from "@/p2p/audio/localTracks";
 import { toP2PTrackUrl } from "@/p2p/audio/urls";
 import { useP2PConnectionStore } from "@/store/p2pConnection";
 import type { DiscoverRoomsType, GetActiveRoomsType, GetDefaultAudioType } from "@beatsync/shared";
 import { ClientActionEnum } from "@beatsync/shared";
 import { nanoid } from "nanoid";
-import { getLocalTrack } from "@/p2p/audio/localTracks";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 
 export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
@@ -50,8 +49,7 @@ export const fetchAudio = async (url: string) => {
   if (isP2PTrackUrl(url)) {
     const trackId = parseP2PTrackId(url);
     if (!trackId) throw new Error("Invalid P2P track URL");
-    const record = await getLocalTrack(trackId);
-    if (!record) throw new Error(`Track not available: ${trackId}`);
+    const record = await ensureP2PTrackLocal(trackId);
     return record.blob;
   }
 
