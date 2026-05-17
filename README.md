@@ -1,6 +1,8 @@
 # Beatsync P2P
 
-Synchronized multi-device playback in the browser — fully **peer-to-peer** via [Trystero](https://github.com/dmotz/trystero). Create a room, upload tracks, and play in sync with friends. No Beatsync backend, no cloud storage for your audio.
+Ephemeral Synchronized multi-device audio playback in the browser — fully **peer-to-peer** via [Trystero](https://github.com/dmotz/trystero). 
+
+> Create a room, upload tracks and play in sync. No backend, no cloud storage, no leaks.
 
 ## Live demo
 
@@ -37,27 +39,6 @@ Upload audio from the queue panel. Files stay local and replicate to other peers
 - **Room id:** `beatsync-p2p-v1-{6-digit-code}` (Trystero)
 - **Track ids:** `p2p://{trackId}` — blobs in IndexedDB, transferred via Trystero `audio-track` actions
 - **Sync:** NTP-style probes between peers; play/pause scheduled against a shared clock
-
-## Environment
-
-`apps/client/.env` (optional for local dev):
-
-```sh
-NEXT_TELEMETRY_DISABLED=1
-NEXT_PUBLIC_P2P_MODE=1
-```
-
-`NEXT_PUBLIC_P2P_MODE=1` is the default for this repo.
-
-## Scripts
-
-```bash
-bun dev                          # Next.js dev server
-bun run build                    # Production build
-bun run --filter client build:pages   # Static export for GitHub Pages
-bun run --filter client typecheck
-bun run --filter client test
-```
 
 ## Repository
 
