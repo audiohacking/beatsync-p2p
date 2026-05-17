@@ -12,7 +12,7 @@ import { useRoomStore } from "@/store/room";
 import { toP2PTrackUrl } from "@/p2p/audio/urls";
 import { getProbeStats, type NTPMeasurement } from "@/utils/ntp";
 import { ClientActionEnum, WSResponseType } from "@beatsync/shared";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 interface TrysteroManagerProps {
   roomId: string;
@@ -45,6 +45,8 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
   const sendRequest = useP2PConnectionStore((state) => state.sendRequest);
   const isConnected = useP2PConnectionStore((state) => state.isConnected);
   const trysteroRoomId = useP2PConnectionStore((state) => state.trysteroRoomId);
+  const joinedRoomRef = useRef<string | null>(null);
+  const geoSentRef = useRef(false);
 
   const { startHeartbeat, stopHeartbeat, markNTPResponseReceived } = useNtpHeartbeat({
     onConnectionStale: () => {
@@ -125,43 +127,41 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
     setOnServerMessage(onServerMessage);
   }, [onServerMessage, setOnServerMessage]);
 
+  // Do NOT depend on `isConnected` — connect() sets it true, which re-ran this effect,
+  // cleanup called disconnect(), and caused an infinite connect/disconnect loop (React #185).
   useEffect(() => {
     if (isLoadingRoom || !roomId || !username || !clientId) return;
-    if (isConnected) return;
+    if (joinedRoomRef.current === roomId) return;
 
+    joinedRoomRef.current = roomId;
+    geoSentRef.current = false;
     connect({ roomCode: roomId, clientId, username });
     startHeartbeat();
 
-    if (!IS_DEMO_MODE) {
-      void getUserLocation()
-        .then((location) => {
-          sendRequest({
-            type: ClientActionEnum.enum.SEND_IP,
-            location,
-          });
-        })
-        .catch(() => {
-          console.warn("[P2P] Geolocation unavailable; continuing without location");
-        });
-    }
-
     return () => {
+      joinedRoomRef.current = null;
+      geoSentRef.current = false;
       stopHeartbeat();
       useGlobalStore.getState().onConnectionReset();
       disconnect();
     };
-  }, [
-    isLoadingRoom,
-    roomId,
-    username,
-    clientId,
-    isConnected,
-    connect,
-    disconnect,
-    startHeartbeat,
-    stopHeartbeat,
-    sendRequest,
-  ]);
+  }, [isLoadingRoom, roomId, username, clientId, connect, disconnect, startHeartbeat, stopHeartbeat]);
+
+  useEffect(() => {
+    if (IS_DEMO_MODE || !isConnected || geoSentRef.current) return;
+    geoSentRef.current = true;
+
+    void getUserLocation()
+      .then((location) => {
+        sendRequest({
+          type: ClientActionEnum.enum.SEND_IP,
+          location,
+        });
+      })
+      .catch(() => {
+        console.warn("[P2P] Geolocation unavailable; continuing without location");
+      });
+  }, [isConnected, sendRequest]);
 
   useEffect(() => {
     if (trysteroRoomId) {

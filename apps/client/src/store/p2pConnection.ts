@@ -155,8 +155,25 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       coordinator.applySnapshot(cached);
     }
 
+    const commitConnectionState = (peerList: string[]) => {
+      set({
+        room,
+        trysteroRoomId,
+        roomCode,
+        session,
+        coordinator,
+        isConnected: true,
+        connectedPeerIds: peerList,
+      });
+    };
+
     const updatePeers = () => {
-      set({ connectedPeerIds: [...peerIds] });
+      const peerList = [...peerIds];
+      queueMicrotask(() => {
+        if (get().coordinator === coordinator) {
+          set({ connectedPeerIds: peerList });
+        }
+      });
     };
 
     getEnvelopeAction((data) => {
@@ -179,18 +196,6 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       updatePeers();
     });
 
-    updatePeers();
-
-    set({
-      room,
-      trysteroRoomId,
-      roomCode,
-      session,
-      coordinator,
-      isConnected: true,
-      connectedPeerIds: [...peerIds],
-    });
-
     const flushLocalRoomState = () => {
       const { onServerMessage } = get();
       if (!onServerMessage) return;
@@ -201,7 +206,10 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       get().sendRequest({ type: "SYNC" });
     };
 
-    queueMicrotask(flushLocalRoomState);
+    queueMicrotask(() => {
+      commitConnectionState([...peerIds]);
+      flushLocalRoomState();
+    });
   },
 
   disconnect: () => {
