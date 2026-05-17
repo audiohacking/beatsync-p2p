@@ -10,6 +10,8 @@ Ephemeral Synchronized multi-device audio playback in the browser — fully **pe
 
 Open the link, join or create a 6-digit room, and share the URL with others in the same session.
 
+> Demo is hosted on github pages without any backend 🎉
+
 ## Why P2P?
 
 This fork is built around a **serverless** room model:
