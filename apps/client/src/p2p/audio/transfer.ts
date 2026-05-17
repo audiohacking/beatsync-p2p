@@ -1,3 +1,4 @@
+import { normalizeAudioMimeType } from "@/lib/audioFormats";
 import { parseP2PTrackId } from "@/p2p/audio/urls";
 import { getLocalTrack, saveLocalTrack, type LocalTrackRecord } from "@/p2p/audio/localTracks";
 import { joinRoom } from "trystero";
@@ -26,8 +27,10 @@ export function initP2PAudioTransfer(room: TrysteroRoom): void {
     const record: LocalTrackRecord = {
       trackId: meta.trackId,
       fileName: meta.fileName ?? "track",
-      mimeType: meta.mimeType ?? "audio/mpeg",
-      blob: new Blob([data], { type: meta.mimeType ?? "audio/mpeg" }),
+      mimeType: normalizeAudioMimeType(meta.mimeType ?? "", meta.fileName ?? ""),
+      blob: new Blob([data], {
+        type: normalizeAudioMimeType(meta.mimeType ?? "", meta.fileName ?? ""),
+      }),
       createdAt: Date.now(),
     };
     await saveLocalTrack(record);
@@ -45,7 +48,7 @@ export async function broadcastLocalTrackToRoom(room: TrysteroRoom, record: Loca
   const meta: TrackTransferMeta = {
     trackId: record.trackId,
     fileName: record.fileName,
-    mimeType: record.mimeType,
+    mimeType: normalizeAudioMimeType(record.mimeType, record.fileName),
   };
   await sendTrack(buffer, null, meta);
 }

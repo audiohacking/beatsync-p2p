@@ -4,8 +4,9 @@ import { getClientId } from "@/lib/clientId";
 import { getKickBuffer } from "@/components/dashboard/Metronome";
 import { IS_DEMO_MODE } from "@/lib/demo";
 import { IS_P2P_MODE } from "@/lib/p2p";
+import { getLocalTrack } from "@/p2p/audio/localTracks";
 import { loadP2PTrackArrayBuffer } from "@/p2p/audio/transfer";
-import { isP2PTrackUrl } from "@/p2p/audio/urls";
+import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 import { getApiUrl } from "@/lib/urls";
 import { extractFileNameFromUrl } from "@/lib/utils";
 import {
@@ -357,11 +358,16 @@ const resolveAudioUrl = (url: string): string => (url.startsWith("/") ? `${getAp
 
 const downloadBufferFromURL = async (data: { url: string; onProgress?: (loaded: number, total: number) => void }) => {
   if (isP2PTrackUrl(data.url)) {
+    const trackId = parseP2PTrackId(data.url);
+    const record = trackId ? await getLocalTrack(trackId) : null;
     const arrayBuffer = await loadP2PTrackArrayBuffer(data.url);
     if (data.onProgress) {
       data.onProgress(arrayBuffer.byteLength, arrayBuffer.byteLength);
     }
-    const audioBuffer = await audioContextManager.decodeAudioData(arrayBuffer);
+    const audioBuffer = await audioContextManager.decodeAudioData(arrayBuffer, {
+      mimeType: record?.mimeType,
+      fileName: record?.fileName,
+    });
     return { audioBuffer };
   }
 

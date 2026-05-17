@@ -16,6 +16,8 @@ export type PositionType = z.infer<typeof PositionSchema>;
 
 export const AudioSourceSchema = z.object({
   url: z.string(),
+  /** Original filename when known (e.g. MP3 upload); used for queue display. */
+  name: z.string().optional(),
 });
 export type AudioSourceType = z.infer<typeof AudioSourceSchema>;
 

@@ -15,7 +15,7 @@ export const Main = () => {
         <Queue className="mb-8" />
         {IS_P2P_MODE && (
           <p className="text-xs text-neutral-500 text-center">
-            Audio stays in your browser and is shared peer-to-peer with the room.
+            Upload MP3 (recommended) or other audio — files stay in your browser and sync peer-to-peer.
           </p>
         )}
       </motion.div>

@@ -1,4 +1,4 @@
-import { cn, extractFileNameFromUrl, formatTime } from "@/lib/utils";
+import { cn, extractFileNameFromUrl, formatTime, trimFileName } from "@/lib/utils";
 import { AudioSourceState, useGlobalStore } from "@/store/global";
 import { sendWSRequest } from "@/utils/ws";
 import { ClientActionEnum } from "@beatsync/shared";
@@ -237,7 +237,9 @@ export const QueueSortableItem = ({
               isLoading && "opacity-60"
             )}
           >
-            {extractFileNameFromUrl(sourceState.source.url)}
+            {sourceState.source.name
+              ? trimFileName(sourceState.source.name)
+              : extractFileNameFromUrl(sourceState.source.url)}
             {isError && sourceState.error && <span className="text-xs text-red-400 ml-2">({sourceState.error})</span>}
           </div>
         </div>

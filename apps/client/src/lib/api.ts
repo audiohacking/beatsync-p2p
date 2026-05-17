@@ -1,3 +1,4 @@
+import { normalizeAudioMimeType } from "@/lib/audioFormats";
 import { IS_P2P_MODE } from "@/lib/p2p";
 import { broadcastLocalTrackToRoom } from "@/p2p/audio/transfer";
 import { saveLocalTrack } from "@/p2p/audio/localTracks";
@@ -16,11 +17,12 @@ export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
 
   const trackId = nanoid();
   const url = toP2PTrackUrl(trackId);
+  const mimeType = normalizeAudioMimeType(data.file.type, data.file.name);
   const record = {
     trackId,
     fileName: data.file.name,
-    mimeType: data.file.type || "audio/mpeg",
-    blob: data.file,
+    mimeType,
+    blob: data.file.type ? data.file : new Blob([data.file], { type: mimeType }),
     createdAt: Date.now(),
   };
 
@@ -33,7 +35,7 @@ export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
 
   p2p.sendRequest({
     type: ClientActionEnum.enum.REGISTER_AUDIO_SOURCE,
-    source: { url },
+    source: { url, name: data.file.name },
   });
 
   const room = p2p.room;

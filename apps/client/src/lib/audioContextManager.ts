@@ -1,3 +1,4 @@
+import { decodeAudioArrayBuffer } from "@/lib/decodeAudio";
 import { LOW_PASS_CONSTANTS } from "@beatsync/shared";
 
 /** iOS 18+ uses a non-standard "interrupted" state (e.g. phone call, Siri) */
@@ -362,9 +363,11 @@ class AudioContextManager {
   /**
    * Decode audio data using the shared context
    */
-  async decodeAudioData(arrayBuffer: ArrayBuffer): Promise<AudioBuffer> {
-    const ctx = this.getContext();
-    return await ctx.decodeAudioData(arrayBuffer);
+  async decodeAudioData(
+    arrayBuffer: ArrayBuffer,
+    options?: { mimeType?: string; fileName?: string }
+  ): Promise<AudioBuffer> {
+    return decodeAudioArrayBuffer(arrayBuffer, options ?? {});
   }
 
   /**
