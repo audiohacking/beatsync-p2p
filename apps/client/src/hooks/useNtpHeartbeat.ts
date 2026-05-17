@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useGlobalStore, MAX_NTP_MEASUREMENTS } from "@/store/global";
+import { getNtpMeasurementsRequired } from "@/p2p/permissions";
+import { useGlobalStore } from "@/store/global";
 import { NTP_CONSTANTS } from "@beatsync/shared";
 
 interface UseNtpHeartbeatProps {
@@ -24,8 +25,9 @@ export const useNtpHeartbeat = ({ onConnectionStale }: UseNtpHeartbeatProps) => 
 
     // Determine interval based on whether we have initial measurements
     const currentMeasurements = useGlobalStore.getState().syncMeasurements;
+    const ntpTarget = getNtpMeasurementsRequired();
     const interval =
-      currentMeasurements.length < MAX_NTP_MEASUREMENTS
+      currentMeasurements.length < ntpTarget
         ? NTP_CONSTANTS.INITIAL_INTERVAL_MS
         : NTP_CONSTANTS.STEADY_STATE_INTERVAL_MS;
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { joinRoom } from "trystero";
 
 type TrysteroRoom = ReturnType<typeof joinRoom>;
@@ -60,12 +61,12 @@ const REPLICATED_REQUEST_TYPES = new Set<WSRequestType["type"]>([
 ]);
 
 const INITIATOR_ONLY_REQUEST_TYPES = new Set<WSRequestType["type"]>([
-  "PLAY",
-  "PAUSE",
   "SEARCH_MUSIC",
   "STREAM_MUSIC",
   "LOAD_DEFAULT_TRACKS",
 ]);
+
+const PLAYBACK_REQUEST_TYPES = new Set<WSRequestType["type"]>(["PLAY", "PAUSE"]);
 
 interface AttachSessionParams {
   room: TrysteroRoom;
@@ -245,6 +246,10 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
         deliverRoomPayload(coordinator, onServerMessage, message);
       });
       get().requestRoomSync();
+
+      if (IS_P2P_MODE) {
+        void useGlobalStore.getState().setIsInitingSystem(false);
+      }
     };
 
     void finishAttach();
@@ -302,7 +307,8 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
 
   sendRequest: (request) => {
     const { session, coordinator, isReady, connectedPeerIds } = get();
-    if (!isReady || !session || !coordinator || !sendEnvelopeImpl) return;
+    if (!session || !coordinator || !sendEnvelopeImpl) return;
+    if (!isReady && !IS_P2P_MODE) return;
 
     const envelope: P2PRequestEnvelope = {
       kind: "request",
@@ -332,7 +338,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       return;
     }
 
-    if (REPLICATED_REQUEST_TYPES.has(request.type)) {
+    if (REPLICATED_REQUEST_TYPES.has(request.type) || PLAYBACK_REQUEST_TYPES.has(request.type)) {
       void coordinator.handleInitiatorRequest(envelope);
       sendEnvelopeImpl(envelope, null);
       return;
@@ -392,7 +398,10 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
           coordinator.handleRemoteAudioLoaded(envelope.clientId);
           return;
         default:
-          if (REPLICATED_REQUEST_TYPES.has(envelope.payload.type)) {
+          if (
+            REPLICATED_REQUEST_TYPES.has(envelope.payload.type) ||
+            PLAYBACK_REQUEST_TYPES.has(envelope.payload.type)
+          ) {
             void coordinator.handleInitiatorRequest(envelope);
           }
           return;

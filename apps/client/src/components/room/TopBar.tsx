@@ -1,8 +1,11 @@
 "use client";
 import { SOCIAL_LINKS } from "@/constants";
+import { useRoomDashboardReady } from "@/hooks/useRoomDashboardReady";
 import { audioContextManager } from "@/lib/audioContextManager";
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { appPath } from "@/lib/paths";
-import { MAX_NTP_MEASUREMENTS, useGlobalStore } from "@/store/global";
+import { getNtpMeasurementsRequired } from "@/p2p/permissions";
+import { useGlobalStore } from "@/store/global";
 import { Crown, Hash, Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
@@ -20,13 +23,15 @@ export const TopBar = ({ roomId }: TopBarProps) => {
   const connectedClientCount = useGlobalStore((state) => state.connectedClients.length);
   const clockOffset = useGlobalStore((state) => state.offsetEstimate);
   const syncMeasurementCount = useGlobalStore((state) => state.syncMeasurements.length);
+  const ntpTarget = getNtpMeasurementsRequired();
+  const roomReady = useRoomDashboardReady();
 
   // Get current user from global store to check admin status
   const currentUser = useGlobalStore((state) => state.currentUser);
-  const isAdmin = currentUser?.isAdmin || false;
+  const isAdmin = IS_P2P_MODE || currentUser?.isAdmin || false;
 
-  // Show minimal nav bar when synced and not loading
-  if (!isLoadingAudio && isSynced) {
+  // Show minimal nav once the room UI is active (P2P: before NTP completes)
+  if (roomReady) {
     return (
       <div className="h-8 bg-black/80 backdrop-blur-md z-50 flex items-center justify-between px-4 border-b border-zinc-800">
         <div className="flex items-center space-x-4 text-xs text-neutral-400 py-2 md:py-0">
@@ -59,18 +64,19 @@ export const TopBar = ({ roomId }: TopBarProps) => {
                 stroke="currentColor"
                 strokeWidth="1.5"
                 className="text-green-500"
-                strokeDasharray={`${(syncMeasurementCount / MAX_NTP_MEASUREMENTS) * 31.4} 31.4`}
+                strokeDasharray={`${(syncMeasurementCount / ntpTarget) * 31.4} 31.4`}
                 strokeLinecap="round"
                 transform="rotate(-90 7 7)"
                 initial={{ strokeDasharray: "0 31.4" }}
                 animate={{
-                  strokeDasharray: `${(syncMeasurementCount / MAX_NTP_MEASUREMENTS) * 31.4} 31.4`,
+                  strokeDasharray: `${(syncMeasurementCount / ntpTarget) * 31.4} 31.4`,
                 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
               />
             </motion.svg>
             <span className="text-xs">
-              {syncMeasurementCount}/{MAX_NTP_MEASUREMENTS}
+              {syncMeasurementCount}/{ntpTarget}
+              {!isSynced && IS_P2P_MODE ? " · syncing" : ""}
             </span>
           </div>
           <div className="flex items-center">

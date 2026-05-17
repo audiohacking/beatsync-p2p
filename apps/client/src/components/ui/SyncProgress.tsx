@@ -1,8 +1,10 @@
 "use client";
 
 import { SOCIAL_LINKS } from "@/constants";
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { publicAssetPath } from "@/lib/paths";
-import { MAX_NTP_MEASUREMENTS, useGlobalStore } from "@/store/global";
+import { getNtpMeasurementsRequired } from "@/p2p/permissions";
+import { useGlobalStore } from "@/store/global";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 
@@ -63,12 +65,14 @@ const OuterModal = ({ children }: { children: React.ReactNode }) => {
 };
 
 const PILL_COUNT = 8;
-const MEASUREMENTS_PER_PILL = MAX_NTP_MEASUREMENTS / PILL_COUNT;
 
 export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." }: SyncProgressProps) => {
   // ALL hooks must be declared before any early returns
+  const ntpTarget = getNtpMeasurementsRequired();
+  const measurementsPerPill = ntpTarget / PILL_COUNT;
   const measurementCount = useGlobalStore((state) => state.syncMeasurements.length);
   const isSyncComplete = useGlobalStore((state) => state.isSynced);
+  const isInitingSystem = useGlobalStore((state) => state.isInitingSystem);
   const setIsInitingSystem = useGlobalStore((state) => state.setIsInitingSystem);
   const hasUserStartedSystem = useGlobalStore((state) => state.hasUserStartedSystem);
   const roundTripEstimate = useGlobalStore((state) => state.roundTripEstimate);
@@ -86,10 +90,16 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
     return () => clearTimeout(timer);
   }, [isSyncComplete]);
 
+  // P2P: no extra "Start System" gate — enter the room as soon as clock sync is ready
+  useEffect(() => {
+    if (!IS_P2P_MODE || !isSyncComplete || !isInitingSystem) return;
+    void setIsInitingSystem(false);
+  }, [isSyncComplete, isInitingSystem, setIsInitingSystem]);
+
   const probeStats = useGlobalStore((state) => state.probeStats);
 
   const message = isLoading ? loadingMessage : "Synchronizing time...";
-  const litPills = isLoading ? 0 : Math.min(PILL_COUNT, Math.floor(measurementCount / MEASUREMENTS_PER_PILL));
+  const litPills = isLoading ? 0 : Math.min(PILL_COUNT, Math.floor(measurementCount / measurementsPerPill));
 
   // Check if max reconnection attempts have been reached
   const hasReconnectionFailed =
@@ -270,7 +280,7 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
   }
 
   if (showComplete) {
-    if (hasUserStartedSystem) {
+    if (hasUserStartedSystem || IS_P2P_MODE) {
       return null;
     }
 
@@ -423,7 +433,7 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
           <div className="flex justify-between">
             <span>measurements</span>
             <span className="text-neutral-400">
-              {measurementCount} / {MAX_NTP_MEASUREMENTS}
+              {measurementCount} / {ntpTarget}
             </span>
           </div>
           <div className="flex justify-between">

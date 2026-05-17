@@ -1,5 +1,10 @@
 import { deleteLocalTrack } from "@/p2p/audio/localTracks";
-import { coerceP2PPlaybackPermissions, isP2PEqualPeerMode, P2P_DEFAULT_PLAYBACK_PERMISSIONS } from "@/p2p/permissions";
+import {
+  coerceP2PPlaybackPermissions,
+  isP2PEqualPeerMode,
+  normalizeP2PClient,
+  P2P_DEFAULT_PLAYBACK_PERMISSIONS,
+} from "@/p2p/permissions";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 import { ChatManager } from "@/p2p/host/ChatManager";
 import { computeCacheRichness, type RoomCacheSnapshot, saveRoomCache } from "@/p2p/roomCache";
@@ -109,6 +114,12 @@ export class P2PRoomCoordinator {
     if (this.peerSessions.has(session.peerId)) {
       const existing = this.peerSessions.get(session.peerId)!;
       if (session.username) existing.username = session.username;
+      if (isP2PEqualPeerMode()) {
+        const client = this.clients.get(session.clientId);
+        if (client) {
+          this.clients.set(session.clientId, normalizeP2PClient(client));
+        }
+      }
       return;
     }
 
@@ -116,7 +127,7 @@ export class P2PRoomCoordinator {
     this.peerIdByClientId.set(session.clientId, session.peerId);
 
     const prev = this.clients.get(session.clientId);
-    const clientData: ClientDataType = {
+    const clientData: ClientDataType = normalizeP2PClient({
       joinedAt: prev?.joinedAt ?? Date.now(),
       username: session.username,
       clientId: session.clientId,
@@ -128,9 +139,9 @@ export class P2PRoomCoordinator {
       position: prev?.position ?? { x: GRID.ORIGIN_X, y: GRID.ORIGIN_Y - 25 },
       lastNtpResponse: Date.now(),
       location: prev?.location,
-    };
+    });
 
-    if (session.isAdmin || session.isCreator) {
+    if (!isP2PEqualPeerMode() && (session.isAdmin || session.isCreator)) {
       clientData.isAdmin = true;
     }
 
@@ -264,12 +275,17 @@ export class P2PRoomCoordinator {
       case "SEND_CHAT_MESSAGE":
         this.handleChat(clientId, payload.text);
         return;
-      case "PLAY":
+      case "PLAY": {
+        // Fan-out delivers PLAY to every peer; only the initiator schedules playback.
+        if (envelope.fromPeerId !== this.callbacks.getSelfPeerId()) return;
         if (this.canMutate(clientId)) this.handlePlay(clientId, payload);
         return;
-      case "PAUSE":
+      }
+      case "PAUSE": {
+        if (envelope.fromPeerId !== this.callbacks.getSelfPeerId()) return;
         if (this.canMutate(clientId)) this.handlePause(payload);
         return;
+      }
       case "AUDIO_SOURCE_LOADED":
         this.handleAudioSourceLoaded(clientId);
         this.persistCache();

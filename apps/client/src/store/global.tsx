@@ -4,7 +4,13 @@ import { getClientId } from "@/lib/clientId";
 import { getKickBuffer } from "@/components/dashboard/Metronome";
 import { IS_DEMO_MODE } from "@/lib/demo";
 import { IS_P2P_MODE } from "@/lib/p2p";
-import { coerceP2PPlaybackPermissions, P2P_DEFAULT_PLAYBACK_PERMISSIONS } from "@/p2p/permissions";
+import {
+  coerceP2PPlaybackPermissions,
+  getNtpMeasurementsRequired,
+  normalizeP2PClient,
+  normalizeP2PClientRoster,
+  P2P_DEFAULT_PLAYBACK_PERMISSIONS,
+} from "@/p2p/permissions";
 import { getLocalTrack } from "@/p2p/audio/localTracks";
 import { reconcileP2PAudioSources } from "@/p2p/audio/availableSources";
 import { loadP2PTrackArrayBuffer } from "@/p2p/audio/transfer";
@@ -1084,13 +1090,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     addProbePairResult: (result) => {
       const prev = get();
       let results = [...prev.syncMeasurements];
-      if (results.length >= MAX_NTP_MEASUREMENTS) {
+      const ntpTarget = getNtpMeasurementsRequired();
+      if (results.length >= ntpTarget) {
         results = [...results.slice(1), result];
       } else {
         results.push(result);
       }
 
-      const nowSynced = !prev.isSynced && results.length >= MAX_NTP_MEASUREMENTS;
+      const nowSynced = !prev.isSynced && results.length >= ntpTarget;
       const { averageOffset, averageRoundTrip } = calculateOffsetEstimate(results);
       set({
         syncMeasurements: results,
@@ -1309,19 +1316,35 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     setConnectedClients: (clients) => {
       const clientId = getClientId();
-      let roster = clients;
+      let roster = normalizeP2PClientRoster(clients);
 
       // Remote join snapshots may list only peers the sender knows — keep ourselves in the roster.
       if (IS_P2P_MODE && !roster.some((c) => c.clientId === clientId)) {
         const self = get().currentUser;
         if (self?.clientId === clientId) {
-          roster = [...roster, self];
+          roster = [...roster, normalizeP2PClient(self)];
         }
       }
 
-      const currentUser = roster.find((client) => client.clientId === clientId);
+      let currentUser = roster.find((client) => client.clientId === clientId);
+      if (!currentUser && IS_P2P_MODE) {
+        currentUser = normalizeP2PClient({
+          clientId,
+          username: get().currentUser?.username ?? "You",
+          joinedAt: Date.now(),
+          isAdmin: true,
+          isCreator: false,
+          rtt: 0,
+          compensationMs: 0,
+          nudgeMs: 0,
+          position: { x: 50, y: 25 },
+          lastNtpResponse: Date.now(),
+        });
+        roster = [...roster, currentUser];
+      }
+      currentUser = normalizeP2PClient(currentUser!);
 
-      if (!currentUser) {
+      if (!roster.some((c) => c.clientId === clientId) && !IS_P2P_MODE) {
         console.warn(
           `[room] Ignoring CLIENT_CHANGE without local user (${clientId}); peers=${roster.map((c) => c.clientId).join(",")}`
         );

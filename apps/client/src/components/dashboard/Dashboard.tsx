@@ -1,4 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRoomDashboardReady } from "@/hooks/useRoomDashboardReady";
+import { IS_P2P_MODE } from "@/lib/p2p";
 import { useGlobalStore } from "@/store/global";
 import { Library, ListMusic, PartyPopper } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -18,8 +20,7 @@ export const Dashboard = ({ roomId }: DashboardProps) => {
   const isSynced = useGlobalStore((state) => state.isSynced);
   const isLoadingAudio = useGlobalStore((state) => state.isInitingSystem);
   const hasUserStartedSystem = useGlobalStore((state) => state.hasUserStartedSystem);
-
-  const isReady = isSynced && !isLoadingAudio;
+  const isReady = useRoomDashboardReady();
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -40,6 +41,17 @@ export const Dashboard = ({ roomId }: DashboardProps) => {
 
       {/* Show SyncProgress during reconnection (when user has already started but lost sync) */}
       {!isSynced && hasUserStartedSystem && !isLoadingAudio && <SyncProgress />}
+
+      {/* P2P: thin sync banner while the room is usable */}
+      {IS_P2P_MODE && isReady && !isSynced && (
+        <motion.div
+          className="shrink-0 border-b border-yellow-900/40 bg-yellow-950/40 px-4 py-2 text-center text-xs text-yellow-200/90"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          Synchronizing clock with peers — you can upload and queue tracks; playback sync improves as probes complete.
+        </motion.div>
+      )}
 
       {isReady && (
         <motion.div
