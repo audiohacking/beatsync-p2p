@@ -253,16 +253,14 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3, delay: 0.3 }}
           >
-            {
-              "You might have a spotty connection or a new deployment is in progress. If this issue persists, please report it on the "
-            }
+            {"You might have a spotty connection or a new deployment is in progress. If this issue persists, please "}
             <a
-              href={SOCIAL_LINKS.discord}
+              href={`${SOCIAL_LINKS.github}/issues`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary/75 underline"
             >
-              Discord
+              open an issue on GitHub
             </a>
             .
           </motion.p>

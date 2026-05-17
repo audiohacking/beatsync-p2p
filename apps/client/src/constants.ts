@@ -1,4 +1,9 @@
+/** Public demo (GitHub Pages). */
+export const DEMO_URL = "https://audiohacking.github.io/beatsync-p2p";
+
+/** Source repository for this fork. */
+export const REPO_URL = "https://github.com/audiohacking/beatsync-p2p";
+
 export const SOCIAL_LINKS = {
-  discord: "https://discord.beatsync.gg",
-  github: "https://github.com/freeman-jiang/beatsync",
+  github: REPO_URL,
 } as const;

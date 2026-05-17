@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { FaDiscord, FaGithub } from "react-icons/fa";
+import { FaGithub } from "react-icons/fa";
 import { toast } from "sonner";
 import { ActiveRooms } from "./ActiveRooms";
 import { AnnouncementBanner } from "./AnnouncementBanner";
@@ -311,23 +311,12 @@ export const Join = () => {
             transition={{ duration: 0.4, delay: 0.5 }}
           />
 
-          {/* Social links */}
           <motion.div
-            className="flex items-center gap-4"
+            className="flex items-center justify-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4, delay: 0.6 }}
           >
-            <a
-              href={SOCIAL_LINKS.discord}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-xs"
-            >
-              <FaDiscord className="size-[17px]" />
-              <span>Join Community</span>
-            </a>
-            <div className="w-px h-4 bg-neutral-700" />
             <a
               href={SOCIAL_LINKS.github}
               target="_blank"
@@ -335,7 +324,7 @@ export const Join = () => {
               className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-xs"
             >
               <FaGithub className="size-4" />
-              <span>GitHub</span>
+              <span>Source on GitHub</span>
             </a>
           </motion.div>
         </motion.div>
