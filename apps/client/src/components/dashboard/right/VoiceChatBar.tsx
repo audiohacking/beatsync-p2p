@@ -28,7 +28,7 @@ export const VoiceChatBar = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2 }}
       >
-        <motion.div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400 min-w-0">
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-400 min-w-0">
           <Headphones className="size-3.5 shrink-0 text-primary-400" />
           <span className="truncate">Voice</span>
           {isJoined && (
@@ -36,7 +36,7 @@ export const VoiceChatBar = () => {
               {participantCount} in call
             </span>
           )}
-        </motion.div>
+        </div>
 
         <div className="flex flex-1 flex-wrap items-center justify-end gap-1.5">
           {!isJoined ? (

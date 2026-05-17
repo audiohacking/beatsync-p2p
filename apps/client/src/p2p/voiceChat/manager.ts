@@ -6,6 +6,22 @@ type TrysteroRoom = ReturnType<typeof joinRoom>;
 
 type Listener = () => void;
 
+export type VoiceChatSnapshot = {
+  isJoined: boolean;
+  isMuted: boolean;
+  isJoining: boolean;
+  error: string | null;
+  remoteParticipantIds: readonly string[];
+};
+
+const EMPTY_SNAPSHOT: VoiceChatSnapshot = {
+  isJoined: false,
+  isMuted: false,
+  isJoining: false,
+  error: null,
+  remoteParticipantIds: [],
+};
+
 function isVoiceChatMetadata(metadata: unknown): metadata is VoiceChatStreamMetadata {
   return (
     typeof metadata === "object" &&
@@ -29,19 +45,15 @@ class P2PVoiceChatManager {
   private readonly remotePeerIds = new Set<string>();
   private readonly peerAudios = new Map<string, HTMLAudioElement>();
   private readonly listeners = new Set<Listener>();
+  private snapshot: VoiceChatSnapshot = EMPTY_SNAPSHOT;
 
   subscribe = (listener: Listener): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
 
-  getSnapshot = () => ({
-    isJoined: this.joined,
-    isMuted: this.muted,
-    isJoining: this.joining,
-    error: this.error,
-    remoteParticipantIds: [...this.remotePeerIds],
-  });
+  /** Stable reference for useSyncExternalStore — must not allocate on every read. */
+  getSnapshot = (): VoiceChatSnapshot => this.snapshot;
 
   bindRoom(room: TrysteroRoom): void {
     if (this.room === room) return;
@@ -170,7 +182,40 @@ class P2PVoiceChatManager {
     }
   }
 
+  private peerIdsEqual(a: readonly string[], b: readonly string[]): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  /** Returns true when the public snapshot changed. */
+  private commitSnapshot(): boolean {
+    const remoteParticipantIds = [...this.remotePeerIds].sort();
+    const prev = this.snapshot;
+    if (
+      prev.isJoined === this.joined &&
+      prev.isMuted === this.muted &&
+      prev.isJoining === this.joining &&
+      prev.error === this.error &&
+      this.peerIdsEqual(prev.remoteParticipantIds, remoteParticipantIds)
+    ) {
+      return false;
+    }
+
+    this.snapshot = {
+      isJoined: this.joined,
+      isMuted: this.muted,
+      isJoining: this.joining,
+      error: this.error,
+      remoteParticipantIds,
+    };
+    return true;
+  }
+
   private emit(): void {
+    if (!this.commitSnapshot()) return;
     for (const listener of this.listeners) {
       listener();
     }
