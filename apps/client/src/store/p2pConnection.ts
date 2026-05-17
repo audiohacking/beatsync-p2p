@@ -6,6 +6,7 @@ import { joinRoom } from "trystero";
 type TrysteroRoom = ReturnType<typeof joinRoom>;
 import { prepareRoomCacheSnapshot } from "@/p2p/audio/availableSources";
 import { initP2PAudioTransfer, pushLocalTracksToPeer, resetP2PAudioTransfer } from "@/p2p/audio/transfer";
+import { p2pVoiceChat } from "@/p2p/voiceChat/manager";
 import { P2PRoomCoordinator } from "@/p2p/host/P2PRoomCoordinator";
 import { applyCoordinatorFromRoomPayload } from "@/p2p/roomEvents";
 import { parseP2PEnvelope } from "@/p2p/protocol";
@@ -199,10 +200,13 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       }
     });
 
+    p2pVoiceChat.bindRoom(room);
+
     room.onPeerJoin((peerId) => {
       peerIds.add(peerId);
       set({ connectedPeerIds: [...peerIds] });
       coordinator.onPeerJoined(peerId);
+      p2pVoiceChat.onPeerJoined(peerId);
       get().runRoomSync();
       const playlistUrls = useGlobalStore.getState().audioSources.map((as) => as.source.url);
       scheduleTrackPushRetries(() => {
@@ -214,6 +218,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     room.onPeerLeave((peerId) => {
       peerIds.delete(peerId);
       coordinator.removePeer(peerId);
+      p2pVoiceChat.onPeerLeft(peerId);
       set({ connectedPeerIds: [...peerIds] });
     });
 
@@ -262,6 +267,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
   detachSession: () => {
     roomSyncGeneration = beginRoomSyncGeneration();
     const { coordinator } = get();
+    p2pVoiceChat.unbind();
     coordinator?.destroy();
     resetP2PAudioTransfer();
     sendEnvelopeImpl = null;
