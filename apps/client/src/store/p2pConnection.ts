@@ -240,15 +240,19 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       }
 
       set({ isReady: true });
+
       const { onServerMessage } = get();
-      if (!onServerMessage) return;
-      coordinator.hydrateLocalConsumer((message) => {
-        deliverRoomPayload(coordinator, onServerMessage, message);
-      });
+      if (onServerMessage) {
+        coordinator.hydrateLocalConsumer((message) => {
+          deliverRoomPayload(coordinator, onServerMessage, message);
+        });
+      }
+
       get().requestRoomSync();
 
-      if (IS_P2P_MODE) {
-        void useGlobalStore.getState().setIsInitingSystem(false);
+      if (IS_P2P_MODE && attachedRoom === room) {
+        // Sync state update only — avoid async setIsInitingSystem() racing across detach/reattach.
+        useGlobalStore.setState({ isInitingSystem: false, hasUserStartedSystem: true });
       }
     };
 

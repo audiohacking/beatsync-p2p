@@ -1342,7 +1342,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         });
         roster = [...roster, currentUser];
       }
-      currentUser = normalizeP2PClient(currentUser!);
+      if (!currentUser) {
+        console.warn(
+          `[room] Ignoring CLIENT_CHANGE without local user (${clientId}); peers=${roster.map((c) => c.clientId).join(",")}`
+        );
+        return;
+      }
+      currentUser = normalizeP2PClient(currentUser);
 
       if (!roster.some((c) => c.clientId === clientId) && !IS_P2P_MODE) {
         console.warn(

@@ -1,6 +1,7 @@
 "use client";
 import { SOCIAL_LINKS } from "@/constants";
 import { useRoomDashboardReady } from "@/hooks/useRoomDashboardReady";
+import { useP2PConnectionStore } from "@/store/p2pConnection";
 import { audioContextManager } from "@/lib/audioContextManager";
 import { IS_P2P_MODE } from "@/lib/p2p";
 import { appPath } from "@/lib/paths";
@@ -25,10 +26,22 @@ export const TopBar = ({ roomId }: TopBarProps) => {
   const syncMeasurementCount = useGlobalStore((state) => state.syncMeasurements.length);
   const ntpTarget = getNtpMeasurementsRequired();
   const roomReady = useRoomDashboardReady();
+  const p2pAttached = useP2PConnectionStore((state) => state.isReady);
 
   // Get current user from global store to check admin status
   const currentUser = useGlobalStore((state) => state.currentUser);
   const isAdmin = IS_P2P_MODE || currentUser?.isAdmin || false;
+
+  // P2P: never render an empty top bar while Trystero is still attaching
+  if (IS_P2P_MODE && !p2pAttached) {
+    return (
+      <AnimatePresence>
+        <motion.div exit={{ opacity: 0 }} transition={{ duration: 0.5 }}>
+          <SyncProgress loadingMessage="Connecting to peers..." />
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
 
   // Show minimal nav once the room UI is active (P2P: before NTP completes)
   if (roomReady) {

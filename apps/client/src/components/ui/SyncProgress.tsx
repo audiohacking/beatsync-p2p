@@ -1,7 +1,6 @@
 "use client";
 
 import { SOCIAL_LINKS } from "@/constants";
-import { IS_P2P_MODE } from "@/lib/p2p";
 import { publicAssetPath } from "@/lib/paths";
 import { getNtpMeasurementsRequired } from "@/p2p/permissions";
 import { useGlobalStore } from "@/store/global";
@@ -72,7 +71,6 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
   const measurementsPerPill = ntpTarget / PILL_COUNT;
   const measurementCount = useGlobalStore((state) => state.syncMeasurements.length);
   const isSyncComplete = useGlobalStore((state) => state.isSynced);
-  const isInitingSystem = useGlobalStore((state) => state.isInitingSystem);
   const setIsInitingSystem = useGlobalStore((state) => state.setIsInitingSystem);
   const hasUserStartedSystem = useGlobalStore((state) => state.hasUserStartedSystem);
   const roundTripEstimate = useGlobalStore((state) => state.roundTripEstimate);
@@ -89,12 +87,6 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
     const timer = setTimeout(() => setShowComplete(true), 100);
     return () => clearTimeout(timer);
   }, [isSyncComplete]);
-
-  // P2P: no extra "Start System" gate — enter the room as soon as clock sync is ready
-  useEffect(() => {
-    if (!IS_P2P_MODE || !isSyncComplete || !isInitingSystem) return;
-    void setIsInitingSystem(false);
-  }, [isSyncComplete, isInitingSystem, setIsInitingSystem]);
 
   const probeStats = useGlobalStore((state) => state.probeStats);
 
@@ -280,7 +272,7 @@ export const SyncProgress = ({ isLoading = false, loadingMessage = "Loading..." 
   }
 
   if (showComplete) {
-    if (hasUserStartedSystem || IS_P2P_MODE) {
+    if (hasUserStartedSystem) {
       return null;
     }
 
