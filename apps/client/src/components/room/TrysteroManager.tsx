@@ -5,6 +5,9 @@ import { useNtpHeartbeat } from "@/hooks/useNtpHeartbeat";
 import { IS_DEMO_MODE } from "@/lib/demo";
 import { getUserLocation } from "@/lib/ip";
 import { dispatchRoomMessage } from "@/lib/roomMessages";
+import { getTrysteroConfig } from "@/p2p/config";
+import { toTrysteroRoomId } from "@/p2p/constants";
+import { joinRoom } from "trystero";
 import { useP2PConnectionStore } from "@/store/p2pConnection";
 import { useChatStore } from "@/store/chat";
 import { useGlobalStore } from "@/store/global";
@@ -23,6 +26,8 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
   const { clientId } = useClientId();
   const isLoadingRoom = useRoomStore((state) => state.isLoadingRoom);
 
+  const trysteroRoomId = toTrysteroRoomId(roomId);
+
   const addProbePairResult = useGlobalStore((state) => state.addProbePairResult);
   const setConnectedClients = useGlobalStore((state) => state.setConnectedClients);
   const schedulePlay = useGlobalStore((state) => state.schedulePlay);
@@ -39,21 +44,25 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
   const setMessages = useChatStore((state) => state.setMessages);
   const handleLoadAudioSource = useGlobalStore((state) => state.handleLoadAudioSource);
 
-  const connect = useP2PConnectionStore((state) => state.connect);
-  const disconnect = useP2PConnectionStore((state) => state.disconnect);
+  const attachSession = useP2PConnectionStore((state) => state.attachSession);
+  const detachSession = useP2PConnectionStore((state) => state.detachSession);
   const setOnServerMessage = useP2PConnectionStore((state) => state.setOnServerMessage);
   const sendRequest = useP2PConnectionStore((state) => state.sendRequest);
-  const isConnected = useP2PConnectionStore((state) => state.isConnected);
-  const trysteroRoomId = useP2PConnectionStore((state) => state.trysteroRoomId);
-  const joinedRoomRef = useRef<string | null>(null);
-  const geoSentRef = useRef(false);
+  const isReady = useP2PConnectionStore((state) => state.isReady);
+
+  const startHeartbeatRef = useRef<() => void>(() => {});
+  const stopHeartbeatRef = useRef<() => void>(() => {});
 
   const { startHeartbeat, stopHeartbeat, markNTPResponseReceived } = useNtpHeartbeat({
     onConnectionStale: () => {
-      console.warn("[P2P] NTP stale — rejoining room");
-      disconnect();
+      console.warn("[P2P] NTP stale — resetting sync (staying in room)");
+      useGlobalStore.getState().resetNTPConfig();
+      startHeartbeatRef.current();
     },
   });
+
+  startHeartbeatRef.current = startHeartbeat;
+  stopHeartbeatRef.current = stopHeartbeat;
 
   const messageContext = useMemo(
     () => ({
@@ -127,28 +136,36 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
     setOnServerMessage(onServerMessage);
   }, [onServerMessage, setOnServerMessage]);
 
-  // Do NOT depend on `isConnected` — connect() sets it true, which re-ran this effect,
-  // cleanup called disconnect(), and caused an infinite connect/disconnect loop (React #185).
+  const loggedRoomRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (loggedRoomRef.current === trysteroRoomId) return;
+    loggedRoomRef.current = trysteroRoomId;
+    console.log(`[P2P] Joined Trystero room ${trysteroRoomId}`);
+  }, [trysteroRoomId]);
+
+  useEffect(() => {
+    return () => {
+      joinRoom(getTrysteroConfig(), trysteroRoomId).leave();
+    };
+  }, [trysteroRoomId]);
+
   useEffect(() => {
     if (isLoadingRoom || !roomId || !username || !clientId) return;
-    if (joinedRoomRef.current === roomId) return;
 
-    joinedRoomRef.current = roomId;
-    geoSentRef.current = false;
-    connect({ roomCode: roomId, clientId, username });
-    startHeartbeat();
+    const activeRoom = joinRoom(getTrysteroConfig(), trysteroRoomId);
+    attachSession({ room: activeRoom, roomCode: roomId, clientId, username });
+    startHeartbeatRef.current();
 
     return () => {
-      joinedRoomRef.current = null;
-      geoSentRef.current = false;
-      stopHeartbeat();
+      stopHeartbeatRef.current();
       useGlobalStore.getState().onConnectionReset();
-      disconnect();
+      detachSession();
     };
-  }, [isLoadingRoom, roomId, username, clientId, connect, disconnect, startHeartbeat, stopHeartbeat]);
+  }, [isLoadingRoom, roomId, username, clientId, trysteroRoomId, attachSession, detachSession]);
 
+  const geoSentRef = useRef(false);
   useEffect(() => {
-    if (IS_DEMO_MODE || !isConnected || geoSentRef.current) return;
+    if (IS_DEMO_MODE || !isReady || geoSentRef.current) return;
     geoSentRef.current = true;
 
     void getUserLocation()
@@ -161,13 +178,11 @@ export const TrysteroManager = ({ roomId, username }: TrysteroManagerProps) => {
       .catch(() => {
         console.warn("[P2P] Geolocation unavailable; continuing without location");
       });
-  }, [isConnected, sendRequest]);
+  }, [isReady, sendRequest]);
 
   useEffect(() => {
-    if (trysteroRoomId) {
-      console.log(`[P2P] Joined Trystero room ${trysteroRoomId}`);
-    }
-  }, [trysteroRoomId]);
+    geoSentRef.current = false;
+  }, [roomId]);
 
   useEffect(() => {
     const onTrackReceived = (event: Event) => {

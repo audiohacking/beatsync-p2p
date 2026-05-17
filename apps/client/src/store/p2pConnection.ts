@@ -1,10 +1,12 @@
 "use client";
 
-import { getTrysteroConfig } from "@/p2p/config";
-import { toTrysteroRoomId } from "@/p2p/constants";
+import { joinRoom } from "trystero";
+
+type TrysteroRoom = ReturnType<typeof joinRoom>;
 import { initP2PAudioTransfer } from "@/p2p/audio/transfer";
 import { P2PRoomCoordinator } from "@/p2p/host/P2PRoomCoordinator";
 import { parseP2PEnvelope } from "@/p2p/protocol";
+import { toTrysteroRoomId } from "@/p2p/constants";
 import {
   computeCacheRichness,
   loadRoomCache,
@@ -13,10 +15,8 @@ import {
   saveRoomCache,
 } from "@/p2p/roomCache";
 import type { P2PEnvelope, P2PRequestEnvelope, WSRequestType, WSResponseType } from "@beatsync/shared";
-import { joinRoom, selfId } from "trystero";
+import { selfId } from "trystero";
 import { create } from "zustand";
-
-type TrysteroRoom = ReturnType<typeof joinRoom>;
 
 interface P2PSession {
   clientId: string;
@@ -32,7 +32,6 @@ function getNtpAnchorPeerId(peerIds: string[]): string | null {
 const REMOTE_REQUEST_TYPES = new Set<WSRequestType["type"]>(["NTP_REQUEST", "SYNC"]);
 const FANOUT_REQUEST_TYPES = new Set<WSRequestType["type"]>(["AUDIO_SOURCE_LOADED"]);
 
-/** Every peer applies these so local roster / room state stays aligned (initiator also runs locally). */
 const REPLICATED_REQUEST_TYPES = new Set<WSRequestType["type"]>([
   "SEND_IP",
   "SEND_CHAT_MESSAGE",
@@ -51,7 +50,6 @@ const REPLICATED_REQUEST_TYPES = new Set<WSRequestType["type"]>([
   "REORDER_CLIENT",
 ]);
 
-/** Initiator-only: fans out LOAD_AUDIO_SOURCE / SCHEDULED_ACTION broadcasts. */
 const INITIATOR_ONLY_REQUEST_TYPES = new Set<WSRequestType["type"]>([
   "PLAY",
   "PAUSE",
@@ -60,6 +58,13 @@ const INITIATOR_ONLY_REQUEST_TYPES = new Set<WSRequestType["type"]>([
   "LOAD_DEFAULT_TRACKS",
 ]);
 
+interface AttachSessionParams {
+  room: TrysteroRoom;
+  roomCode: string;
+  clientId: string;
+  username: string;
+}
+
 interface P2PConnectionState {
   room: TrysteroRoom | null;
   trysteroRoomId: string | null;
@@ -67,17 +72,18 @@ interface P2PConnectionState {
   session: P2PSession | null;
   connectedPeerIds: string[];
   coordinator: P2PRoomCoordinator | null;
-  isConnected: boolean;
+  isReady: boolean;
   onServerMessage: ((message: WSResponseType) => void) | null;
 
-  connect: (session: P2PSession & { roomCode: string }) => void;
-  disconnect: () => void;
+  attachSession: (params: AttachSessionParams) => void;
+  detachSession: () => void;
   sendRequest: (request: WSRequestType) => void;
   handleIncomingEnvelope: (envelope: P2PEnvelope) => void;
   setOnServerMessage: (handler: (message: WSResponseType) => void) => void;
 }
 
 let sendEnvelopeImpl: ((envelope: P2PEnvelope, targetPeerId?: string | null) => void) | null = null;
+let attachedRoom: TrysteroRoom | null = null;
 
 export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => ({
   room: null,
@@ -86,30 +92,33 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
   session: null,
   connectedPeerIds: [],
   coordinator: null,
-  isConnected: false,
+  isReady: false,
   onServerMessage: null,
 
   setOnServerMessage: (handler) => set({ onServerMessage: handler }),
 
-  connect: ({ roomCode, clientId, username }) => {
-    get().disconnect();
+  attachSession: ({ room, roomCode, clientId, username }) => {
+    if (attachedRoom === room && get().roomCode === roomCode && get().isReady) {
+      return;
+    }
 
+    get().detachSession();
+
+    attachedRoom = room;
     const trysteroRoomId = toTrysteroRoomId(roomCode);
-    const room = joinRoom(getTrysteroConfig(), trysteroRoomId);
+    const session = { clientId, username };
+
     initP2PAudioTransfer(room);
 
     const [sendEnvelopeAction, getEnvelopeAction] = room.makeAction<P2PEnvelope>("envelope");
-
     const peerIds = new Set<string>([selfId]);
-    const session = { clientId, username };
 
     const broadcastEnvelope = (envelope: P2PEnvelope) => {
       void sendEnvelopeAction(envelope, null);
     };
 
     const deliverLocalRoomMessage = (message: WSResponseType) => {
-      const { onServerMessage } = get();
-      onServerMessage?.(message);
+      get().onServerMessage?.(message);
     };
 
     const deliverEnvelope = (envelope: P2PEnvelope, targetPeerId: string | null) => {
@@ -155,27 +164,6 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       coordinator.applySnapshot(cached);
     }
 
-    const commitConnectionState = (peerList: string[]) => {
-      set({
-        room,
-        trysteroRoomId,
-        roomCode,
-        session,
-        coordinator,
-        isConnected: true,
-        connectedPeerIds: peerList,
-      });
-    };
-
-    const updatePeers = () => {
-      const peerList = [...peerIds];
-      queueMicrotask(() => {
-        if (get().coordinator === coordinator) {
-          set({ connectedPeerIds: peerList });
-        }
-      });
-    };
-
     getEnvelopeAction((data) => {
       try {
         get().handleIncomingEnvelope(parseP2PEnvelope(data));
@@ -186,17 +174,29 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
 
     room.onPeerJoin((peerId) => {
       peerIds.add(peerId);
-      updatePeers();
+      set({ connectedPeerIds: [...peerIds] });
       coordinator.onPeerJoined(peerId);
     });
 
     room.onPeerLeave((peerId) => {
       peerIds.delete(peerId);
       coordinator.removePeer(peerId);
-      updatePeers();
+      set({ connectedPeerIds: [...peerIds] });
     });
 
-    const flushLocalRoomState = () => {
+    set({
+      room,
+      trysteroRoomId,
+      roomCode,
+      session,
+      coordinator,
+      connectedPeerIds: [...peerIds],
+      isReady: false,
+    });
+
+    const finishAttach = () => {
+      if (attachedRoom !== room) return;
+      set({ isReady: true });
       const { onServerMessage } = get();
       if (!onServerMessage) return;
       coordinator.hydrateLocalConsumer(onServerMessage);
@@ -206,17 +206,14 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       get().sendRequest({ type: "SYNC" });
     };
 
-    queueMicrotask(() => {
-      commitConnectionState([...peerIds]);
-      flushLocalRoomState();
-    });
+    queueMicrotask(finishAttach);
   },
 
-  disconnect: () => {
-    const { coordinator, room } = get();
+  detachSession: () => {
+    const { coordinator } = get();
     coordinator?.destroy();
-    room?.leave();
     sendEnvelopeImpl = null;
+    attachedRoom = null;
     set({
       room: null,
       trysteroRoomId: null,
@@ -224,13 +221,13 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       session: null,
       connectedPeerIds: [],
       coordinator: null,
-      isConnected: false,
+      isReady: false,
     });
   },
 
   sendRequest: (request) => {
-    const { session, coordinator, isConnected, connectedPeerIds } = get();
-    if (!isConnected || !session || !coordinator || !sendEnvelopeImpl) return;
+    const { session, coordinator, isReady, connectedPeerIds } = get();
+    if (!isReady || !session || !coordinator || !sendEnvelopeImpl) return;
 
     const envelope: P2PRequestEnvelope = {
       kind: "request",
