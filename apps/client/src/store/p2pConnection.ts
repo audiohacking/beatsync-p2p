@@ -3,6 +3,7 @@
 import { joinRoom } from "trystero";
 
 type TrysteroRoom = ReturnType<typeof joinRoom>;
+import { prepareRoomCacheSnapshot } from "@/p2p/audio/availableSources";
 import { initP2PAudioTransfer, pushLocalTracksToPeer, resetP2PAudioTransfer } from "@/p2p/audio/transfer";
 import { P2PRoomCoordinator } from "@/p2p/host/P2PRoomCoordinator";
 import { parseP2PEnvelope } from "@/p2p/protocol";
@@ -167,11 +168,6 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       isAdmin: true,
     });
 
-    const cached = loadRoomCache(roomCode);
-    if (cached) {
-      coordinator.applySnapshot(cached);
-    }
-
     getEnvelopeAction((data) => {
       try {
         get().handleIncomingEnvelope(parseP2PEnvelope(data));
@@ -204,8 +200,18 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       isReady: false,
     });
 
-    const finishAttach = () => {
+    const finishAttach = async () => {
       if (attachedRoom !== room) return;
+
+      const cached = loadRoomCache(roomCode);
+      if (cached) {
+        const prepared = await prepareRoomCacheSnapshot(cached, "local-session");
+        coordinator.applySnapshot(prepared);
+        if (prepared.audioSources.length !== cached.audioSources.length) {
+          saveRoomCache(roomCode, prepared);
+        }
+      }
+
       set({ isReady: true });
       const { onServerMessage } = get();
       if (!onServerMessage) return;
@@ -216,7 +222,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       get().sendRequest({ type: "SYNC" });
     };
 
-    queueMicrotask(finishAttach);
+    void finishAttach();
   },
 
   detachSession: () => {
@@ -290,19 +296,23 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       if (roomCode) {
         const local = loadRoomCache(roomCode);
         const { merged, acceptedRemote } = mergeRoomCaches(local, envelope.snapshot as RoomCacheSnapshot);
-        saveRoomCache(roomCode, merged);
 
         if (!acceptedRemote) {
+          saveRoomCache(roomCode, merged);
           if (computeCacheRichness(merged) > envelope.richness && sendEnvelopeImpl) {
             sendEnvelopeImpl(coordinator.buildStateSnapshotEnvelope(selfId), envelope.fromPeerId);
           }
           return;
         }
 
-        coordinator.applySnapshot(merged);
-        if (onServerMessage) {
-          coordinator.hydrateLocalConsumer(onServerMessage);
-        }
+        void prepareRoomCacheSnapshot(merged, "room").then((prepared) => {
+          coordinator.applySnapshot(prepared);
+          if (roomCode) saveRoomCache(roomCode, prepared);
+          if (onServerMessage) {
+            coordinator.hydrateLocalConsumer(onServerMessage);
+          }
+        });
+        return;
       }
       return;
     }

@@ -5,6 +5,7 @@ import { getKickBuffer } from "@/components/dashboard/Metronome";
 import { IS_DEMO_MODE } from "@/lib/demo";
 import { IS_P2P_MODE } from "@/lib/p2p";
 import { getLocalTrack } from "@/p2p/audio/localTracks";
+import { reconcileP2PAudioSources } from "@/p2p/audio/availableSources";
 import { loadP2PTrackArrayBuffer } from "@/p2p/audio/transfer";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 import { getApiUrl } from "@/lib/urls";
@@ -1492,6 +1493,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         await initializationMutex.waitForUnlock();
       }
 
+      let playlistSources = sources;
+      if (IS_P2P_MODE) {
+        playlistSources = await reconcileP2PAudioSources(sources, "room");
+      }
+
+      let activeSource = currentAudioSource;
+      if (activeSource && !playlistSources.some((s) => s.url === activeSource)) {
+        activeSource = undefined;
+      }
+
       const state = get();
 
       // Clean up buffer access queue - remove URLs that are no longer in the playlist
@@ -1504,14 +1515,14 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const newQueue: string[] = [];
 
       // Add current/selected track first (highest priority)
-      if (currentAudioSource && sources.some((s) => s.url === currentAudioSource)) {
-        newQueue.push(currentAudioSource);
-      } else if (state.selectedAudioUrl && sources.some((s) => s.url === state.selectedAudioUrl)) {
+      if (activeSource && playlistSources.some((s) => s.url === activeSource)) {
+        newQueue.push(activeSource);
+      } else if (state.selectedAudioUrl && playlistSources.some((s) => s.url === state.selectedAudioUrl)) {
         newQueue.push(state.selectedAudioUrl);
       }
 
       // Add remaining tracks in playlist order
-      sources.forEach((source) => {
+      playlistSources.forEach((source) => {
         if (!newQueue.includes(source.url)) {
           newQueue.push(source.url);
         }
@@ -1519,7 +1530,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       // Create new audioSources array (preserving loaded buffers for tracks still in playlist)
       const existingByUrl = new Map(state.audioSources.map((as) => [as.source.url, as]));
-      const newAudioSources: AudioSourceState[] = sources.map((source) => {
+      const newAudioSources: AudioSourceState[] = playlistSources.map((source) => {
         const existing = existingByUrl.get(source.url);
         if (existing) {
           return existing;
@@ -1534,15 +1545,15 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       set({ audioSources: newAudioSources, bufferAccessQueue: newQueue });
 
       // If currentAudioSource is provided from server, update selectedAudioUrl and start loading it
-      if (currentAudioSource) {
-        set({ selectedAudioUrl: currentAudioSource });
-        loadAudioSource(currentAudioSource);
+      if (activeSource) {
+        set({ selectedAudioUrl: activeSource });
+        loadAudioSource(activeSource);
       }
 
       // In demo mode, eagerly load remaining sources if sync is done.
       // In prod, sources load on-demand when the user selects them.
       if (IS_DEMO_MODE && get().isSynced) {
-        eagerLoadIdleSources({ skip: currentAudioSource });
+        eagerLoadIdleSources({ skip: activeSource });
       }
 
       // Check if the currently selected/playing track was removed
