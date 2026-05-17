@@ -251,8 +251,8 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       get().requestRoomSync();
 
       if (IS_P2P_MODE && attachedRoom === room) {
-        // Sync state update only — avoid async setIsInitingSystem() racing across detach/reattach.
-        useGlobalStore.setState({ isInitingSystem: false, hasUserStartedSystem: true });
+        // Show room UI; audio unlock still requires a user gesture (Start System / play).
+        useGlobalStore.setState({ isInitingSystem: false });
       }
     };
 

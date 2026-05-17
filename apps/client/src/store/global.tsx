@@ -13,6 +13,7 @@ import {
 } from "@/p2p/permissions";
 import { getLocalTrack } from "@/p2p/audio/localTracks";
 import { reconcileP2PAudioSources } from "@/p2p/audio/availableSources";
+import { useP2PConnectionStore } from "@/store/p2pConnection";
 import { loadP2PTrackArrayBuffer } from "@/p2p/audio/transfer";
 import { isP2PTrackUrl, parseP2PTrackId } from "@/p2p/audio/urls";
 import { getApiUrl } from "@/lib/urls";
@@ -180,6 +181,8 @@ interface GlobalState extends GlobalStateValues {
   handleSetAudioSources: (data: SetAudioSourcesType) => void;
 
   setIsInitingSystem: (isIniting: boolean) => void;
+  /** Resume AudioContext from a user gesture; returns false if still suspended. */
+  unlockAudio: () => Promise<boolean>;
   reorderClient: (clientId: string) => void;
   setAdminStatus: (clientId: string, isAdmin: boolean) => void;
   changeAudioSource: (url: string) => boolean;
@@ -697,29 +700,40 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       });
     },
 
-    setIsInitingSystem: async (isIniting) => {
-      // When initialization is complete (isIniting = false), check if we need to resume audio
-      if (!isIniting) {
-        // Mark that user has started the system
-        set({ hasUserStartedSystem: true });
-
-        try {
-          await audioContextManager.resume();
-          console.log("AudioContext resumed via user gesture");
-        } catch (err) {
-          console.warn("Failed to resume AudioContext", err);
-        }
-
-        const { socket } = getSocket(get());
-
-        // Request sync with room (catches up playback state if a track is playing)
-        sendWSRequest({
-          ws: socket,
-          request: { type: ClientActionEnum.enum.SYNC },
-        });
+    unlockAudio: async () => {
+      try {
+        await audioContextManager.resume();
+      } catch (err) {
+        console.warn("Failed to resume AudioContext", err);
+        return false;
       }
 
-      // Update the initialization state
+      const ctx = audioContextManager.getContext();
+      if (ctx.state !== "running") {
+        return false;
+      }
+
+      const state = get();
+      if (!state.hasUserStartedSystem) {
+        set({ hasUserStartedSystem: true });
+        if (IS_P2P_MODE) {
+          useP2PConnectionStore.getState().requestRoomSync();
+        } else {
+          const { socket } = getSocket(state);
+          sendWSRequest({
+            ws: socket,
+            request: { type: ClientActionEnum.enum.SYNC },
+          });
+        }
+      }
+
+      return true;
+    },
+
+    setIsInitingSystem: async (isIniting) => {
+      if (!isIniting) {
+        await get().unlockAudio();
+      }
       set({ isInitingSystem: isIniting });
     },
 
@@ -936,28 +950,35 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     // if trackTimeSeconds is not provided, use the current track position
     broadcastPlay: (trackTimeSeconds?: number) => {
-      const state = get();
-      const { socket } = getSocket(state);
+      void (async () => {
+        const unlocked = await get().unlockAudio();
+        if (!unlocked) {
+          toast.error("Tap Start System or press play again to enable audio.");
+          return;
+        }
 
-      // Use selected audio or fall back to first audio source
-      let audioId = state.selectedAudioUrl;
-      if (!audioId && state.audioSources.length > 0) {
-        audioId = state.audioSources[0].source.url;
-      }
+        const state = get();
+        const { socket } = getSocket(state);
 
-      if (!audioId) {
-        console.error("Cannot broadcast play: No audio available");
-        return;
-      }
+        let audioId = state.selectedAudioUrl;
+        if (!audioId && state.audioSources.length > 0) {
+          audioId = state.audioSources[0].source.url;
+        }
 
-      sendWSRequest({
-        ws: socket,
-        request: {
-          type: ClientActionEnum.enum.PLAY,
-          trackTimeSeconds: trackTimeSeconds ?? state.getCurrentTrackPosition(),
-          audioSource: audioId,
-        },
-      });
+        if (!audioId) {
+          console.error("Cannot broadcast play: No audio available");
+          return;
+        }
+
+        sendWSRequest({
+          ws: socket,
+          request: {
+            type: ClientActionEnum.enum.PLAY,
+            trackTimeSeconds: trackTimeSeconds ?? state.getCurrentTrackPosition(),
+            audioSource: audioId,
+          },
+        });
+      })();
     },
 
     broadcastPause: () => {
@@ -1147,11 +1168,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const state = get();
       const { sourceNode, audioContext } = getAudioPlayer(state);
 
-      // Before any audio playback, ensure the context is running
       if (audioContext.state !== "running") {
-        console.log("AudioContext still suspended, aborting play");
-        toast.error("Audio context is suspended. Please try again.");
-        return;
+        const unlocked = await get().unlockAudio();
+        if (!unlocked || audioContextManager.getContext().state !== "running") {
+          console.log("AudioContext still suspended, aborting play");
+          toast.error("Audio is locked — tap Start System or press play to enable sound.");
+          return;
+        }
       }
 
       // Stop any existing source node before creating a new one

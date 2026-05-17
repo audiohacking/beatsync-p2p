@@ -39,7 +39,16 @@ export const Dashboard = ({ roomId }: DashboardProps) => {
       {/* Top bar: Fixed height */}
       <TopBar roomId={roomId} />
 
-      {/* Show SyncProgress during reconnection (when user has already started but lost sync) */}
+      {/* Audio unlock (P2P) or re-sync after connection loss */}
+      {isReady && !hasUserStartedSystem && (
+        <motion.div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
+          <SyncProgress />
+        </motion.div>
+      )}
       {!isSynced && hasUserStartedSystem && !isLoadingAudio && <SyncProgress />}
 
       {/* P2P: thin sync banner while the room is usable */}
