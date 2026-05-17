@@ -38,27 +38,6 @@ Upload audio from the queue panel. Files stay local and replicate to other peers
 - **Track ids:** `p2p://{trackId}` — blobs in IndexedDB, transferred via Trystero `audio-track` actions
 - **Sync:** NTP-style probes between peers; play/pause scheduled against a shared clock
 
-## Environment
-
-`apps/client/.env` (optional for local dev):
-
-```sh
-NEXT_TELEMETRY_DISABLED=1
-NEXT_PUBLIC_P2P_MODE=1
-```
-
-`NEXT_PUBLIC_P2P_MODE=1` is the default for this repo.
-
-## Scripts
-
-```bash
-bun dev                          # Next.js dev server
-bun run build                    # Production build
-bun run --filter client build:pages   # Static export for GitHub Pages
-bun run --filter client typecheck
-bun run --filter client test
-```
-
 ## Credits
 
 This is a fork of [Beatsync](https://github.com/freeman-jiang/beatsync) reimplemented here as a browser-only P2P app. Same LICENSE and attributions.
