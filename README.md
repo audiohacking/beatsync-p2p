@@ -45,3 +45,7 @@ Upload audio from the queue panel. Files stay local and replicate to other peers
 ## Repository
 
 Source and issues: [github.com/audiohacking/beatsync-p2p](https://github.com/audiohacking/beatsync-p2p)
+
+## Credits
+
+This is a fork of https://github.com/freeman-jiang/beatsync under the same LICENSE
