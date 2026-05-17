@@ -6,8 +6,15 @@ type TrysteroRoom = ReturnType<typeof joinRoom>;
 import { prepareRoomCacheSnapshot } from "@/p2p/audio/availableSources";
 import { initP2PAudioTransfer, pushLocalTracksToPeer, resetP2PAudioTransfer } from "@/p2p/audio/transfer";
 import { P2PRoomCoordinator } from "@/p2p/host/P2PRoomCoordinator";
+import { applyCoordinatorFromRoomPayload } from "@/p2p/roomEvents";
 import { parseP2PEnvelope } from "@/p2p/protocol";
 import { toTrysteroRoomId } from "@/p2p/constants";
+import {
+  beginRoomSyncGeneration,
+  isCurrentRoomSyncGeneration,
+  scheduleRoomSyncRetries,
+  scheduleTrackPushRetries,
+} from "@/p2p/roomSync";
 import {
   computeCacheRichness,
   loadRoomCache,
@@ -80,12 +87,25 @@ interface P2PConnectionState {
   attachSession: (params: AttachSessionParams) => void;
   detachSession: () => void;
   sendRequest: (request: WSRequestType) => void;
+  runRoomSync: () => void;
+  requestRoomSync: () => void;
+  pushPlaylistToAllPeers: () => void;
   handleIncomingEnvelope: (envelope: P2PEnvelope) => void;
   setOnServerMessage: (handler: (message: WSResponseType) => void) => void;
 }
 
 let sendEnvelopeImpl: ((envelope: P2PEnvelope, targetPeerId?: string | null) => void) | null = null;
 let attachedRoom: TrysteroRoom | null = null;
+let roomSyncGeneration = 0;
+
+function deliverRoomPayload(
+  coordinator: P2PRoomCoordinator,
+  onServerMessage: ((message: WSResponseType) => void) | null,
+  payload: WSResponseType
+): void {
+  applyCoordinatorFromRoomPayload(coordinator, payload);
+  onServerMessage?.(payload);
+}
 
 export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => ({
   room: null,
@@ -105,6 +125,7 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     }
 
     get().detachSession();
+    roomSyncGeneration = beginRoomSyncGeneration();
 
     attachedRoom = room;
     const trysteroRoomId = toTrysteroRoomId(roomCode);
@@ -127,7 +148,8 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
     };
 
     const deliverLocalRoomMessage = (message: WSResponseType) => {
-      get().onServerMessage?.(message);
+      const { onServerMessage } = get();
+      deliverRoomPayload(coordinator, onServerMessage, message);
     };
 
     const deliverEnvelope = (envelope: P2PEnvelope, targetPeerId: string | null) => {
@@ -180,8 +202,12 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       peerIds.add(peerId);
       set({ connectedPeerIds: [...peerIds] });
       coordinator.onPeerJoined(peerId);
+      get().runRoomSync();
       const playlistUrls = useGlobalStore.getState().audioSources.map((as) => as.source.url);
-      void pushLocalTracksToPeer(peerId, playlistUrls);
+      scheduleTrackPushRetries(() => {
+        if (attachedRoom !== room) return;
+        void pushLocalTracksToPeer(peerId, playlistUrls);
+      });
     });
 
     room.onPeerLeave((peerId) => {
@@ -215,17 +241,17 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       set({ isReady: true });
       const { onServerMessage } = get();
       if (!onServerMessage) return;
-      coordinator.hydrateLocalConsumer(onServerMessage);
-      if (coordinator.getSnapshotRichness() > 0) {
-        coordinator.broadcastStateSnapshot();
-      }
-      get().sendRequest({ type: "SYNC" });
+      coordinator.hydrateLocalConsumer((message) => {
+        deliverRoomPayload(coordinator, onServerMessage, message);
+      });
+      get().requestRoomSync();
     };
 
     void finishAttach();
   },
 
   detachSession: () => {
+    roomSyncGeneration = beginRoomSyncGeneration();
     const { coordinator } = get();
     coordinator?.destroy();
     resetP2PAudioTransfer();
@@ -239,6 +265,38 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       connectedPeerIds: [],
       coordinator: null,
       isReady: false,
+    });
+  },
+
+  runRoomSync: () => {
+    const { coordinator, isReady } = get();
+    if (!isReady || !coordinator || !sendEnvelopeImpl) return;
+    if (coordinator.getSnapshotRichness() > 0) {
+      coordinator.broadcastStateSnapshot();
+    }
+    get().sendRequest({ type: "SYNC" });
+  },
+
+  requestRoomSync: () => {
+    const generation = roomSyncGeneration;
+    get().runRoomSync();
+    scheduleRoomSyncRetries(() => {
+      if (!isCurrentRoomSyncGeneration(generation)) return;
+      get().runRoomSync();
+    }, generation);
+  },
+
+  pushPlaylistToAllPeers: () => {
+    const { room, connectedPeerIds } = get();
+    if (!room) return;
+    const playlistUrls = useGlobalStore.getState().audioSources.map((as) => as.source.url);
+    const remotePeers = connectedPeerIds.filter((id) => id !== selfId);
+    if (remotePeers.length === 0) return;
+
+    scheduleTrackPushRetries(() => {
+      for (const peerId of remotePeers) {
+        void pushLocalTracksToPeer(peerId, playlistUrls);
+      }
     });
   },
 
@@ -309,8 +367,11 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
           coordinator.applySnapshot(prepared);
           if (roomCode) saveRoomCache(roomCode, prepared);
           if (onServerMessage) {
-            coordinator.hydrateLocalConsumer(onServerMessage);
+            coordinator.hydrateLocalConsumer((message) => {
+              deliverRoomPayload(coordinator, onServerMessage, message);
+            });
           }
+          get().pushPlaylistToAllPeers();
         });
         return;
       }
@@ -345,11 +406,11 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
       if (payload.type === "ROOM_EVENT" && payload.event.type === "CLIENT_CHANGE") {
         return;
       }
-      onServerMessage(payload);
+      deliverRoomPayload(coordinator, onServerMessage, payload);
       return;
     }
 
     if (envelope.toPeerId !== selfId) return;
-    onServerMessage(envelope.payload);
+    deliverRoomPayload(coordinator, onServerMessage, envelope.payload);
   },
 }));

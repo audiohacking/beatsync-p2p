@@ -1544,6 +1544,19 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       // Update state immediately to show all sources (with idle states) and cleaned queue
       set({ audioSources: newAudioSources, bufferAccessQueue: newQueue });
 
+      if (IS_P2P_MODE) {
+        const { useP2PConnectionStore } = await import("@/store/p2pConnection");
+        const peerCount = useP2PConnectionStore.getState().connectedPeerIds.length;
+        for (const as of newAudioSources) {
+          if (as.status !== "idle" || !isP2PTrackUrl(as.source.url)) continue;
+          const trackId = parseP2PTrackId(as.source.url);
+          if (peerCount <= 1) {
+            if (!trackId || !(await getLocalTrack(trackId))) continue;
+          }
+          void loadAudioSource(as.source.url);
+        }
+      }
+
       // If currentAudioSource is provided from server, update selectedAudioUrl and start loading it
       if (activeSource) {
         set({ selectedAudioUrl: activeSource });

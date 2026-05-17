@@ -3,6 +3,7 @@ import { IS_P2P_MODE } from "@/lib/p2p";
 import { broadcastLocalTrackToRoom, ensureP2PTrackLocal } from "@/p2p/audio/transfer";
 import { saveLocalTrack } from "@/p2p/audio/localTracks";
 import { toP2PTrackUrl } from "@/p2p/audio/urls";
+import { scheduleTrackPushRetries } from "@/p2p/roomSync";
 import { useP2PConnectionStore } from "@/store/p2pConnection";
 import type { DiscoverRoomsType, GetActiveRoomsType, GetDefaultAudioType } from "@beatsync/shared";
 import { ClientActionEnum } from "@beatsync/shared";
@@ -39,7 +40,9 @@ export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
 
   const room = p2p.room;
   if (room) {
-    void broadcastLocalTrackToRoom(room, record);
+    scheduleTrackPushRetries(() => void broadcastLocalTrackToRoom(room, record));
+    p2p.pushPlaylistToAllPeers();
+    p2p.runRoomSync();
   }
 
   return { success: true, publicUrl: url };

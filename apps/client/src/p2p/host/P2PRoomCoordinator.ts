@@ -190,6 +190,27 @@ export class P2PRoomCoordinator {
     this.chatManager.restoreFromHistory(snapshot.chatMessages, snapshot.chatNextMessageId);
   }
 
+  /** Apply playlist from a peer broadcast/direct snapshot (do not re-broadcast). */
+  applyNetworkAudioSources(sources: AudioSourceType[], currentAudioSource?: string): void {
+    this.audioSources = [...sources];
+    if (currentAudioSource && sources.some((s) => s.url === currentAudioSource)) {
+      this.playbackState = {
+        ...this.playbackState,
+        audioSource: currentAudioSource,
+      };
+    } else if (currentAudioSource === undefined) {
+      // omit — keep existing playback selection
+    } else if (!sources.some((s) => s.url === this.playbackState.audioSource)) {
+      this.playbackState = {
+        type: "paused",
+        audioSource: "",
+        serverTimeToExecute: 0,
+        trackPositionSeconds: 0,
+      };
+    }
+    this.persistCache();
+  }
+
   getSnapshotRichness(): number {
     return computeCacheRichness(this.exportSnapshot());
   }
@@ -251,13 +272,13 @@ export class P2PRoomCoordinator {
         this.persistCache();
         return;
       case "REGISTER_AUDIO_SOURCE":
-        if (this.canMutate(clientId)) this.registerAudioSource(payload.source);
+        if (this.canMutatePlaylist(clientId)) this.registerAudioSource(payload.source);
         return;
       case "DELETE_AUDIO_SOURCES":
-        if (this.canMutate(clientId)) this.deleteAudioSources(payload.urls);
+        if (this.canMutatePlaylist(clientId)) this.deleteAudioSources(payload.urls);
         return;
       case "REORDER_AUDIO_SOURCES":
-        if (this.canMutate(clientId)) this.reorderAudioSources(payload.reorderedAudioSources);
+        if (this.canMutatePlaylist(clientId)) this.reorderAudioSources(payload.reorderedAudioSources);
         return;
       case "SET_GLOBAL_VOLUME":
         if (this.canMutate(clientId)) this.setGlobalVolume(payload.volume);
@@ -351,6 +372,11 @@ export class P2PRoomCoordinator {
     const client = this.clients.get(clientId);
     if (!client) return false;
     return this.playbackControlsPermissions === PlaybackControlsPermissionsEnum.enum.EVERYONE || client.isAdmin;
+  }
+
+  /** Any peer in the roster may add/reorder/remove tracks (P2P uploads). */
+  private canMutatePlaylist(clientId: string): boolean {
+    return this.clients.has(clientId);
   }
 
   private isAdmin(clientId: string): boolean {
@@ -527,6 +553,7 @@ export class P2PRoomCoordinator {
     if (this.audioSources.some((s) => s.url === source.url)) return;
     this.audioSources.push(source);
     this.broadcastAudioSources();
+    this.persistCache();
   }
 
   private deleteAudioSources(urls: string[]): void {
