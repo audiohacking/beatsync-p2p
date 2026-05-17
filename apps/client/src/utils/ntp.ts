@@ -138,19 +138,17 @@ export const validateProbePair = (data: {
 
   const total = pureCount + impureCount;
   const pureRate = total > 0 ? ((pureCount / total) * 100).toFixed(0) : "0";
+  const significantDrift = gapDrift > NTP_CONSTANTS.PROBE_GAP_TOLERANCE_MS;
 
-  if (!isPure) {
-    console.log(
-      `[CodedProbe] IMPURE #${probeGroupId} | clientGap=${clientGap.toFixed(1)}ms serverGap=${serverGap.toFixed(1)}ms drift=${gapDrift.toFixed(1)}ms | pure: ${pureCount}/${total} (${pureRate}%) | sent: ${probeGroupCounter}`
+  if (!isPure || significantDrift) {
+    const label = isPure ? "DRIFT" : "IMPURE";
+    console.warn(
+      `[NTP] ${label} probe #${probeGroupId} | clientGap=${clientGap.toFixed(1)}ms serverGap=${serverGap.toFixed(1)}ms drift=${gapDrift.toFixed(1)}ms | pure: ${pureCount}/${total} (${pureRate}%)`
     );
-    return null;
+    if (!isPure) return null;
   }
 
   const best = first.roundTripDelay <= measurement.roundTripDelay ? first : measurement;
-
-  console.log(
-    `[CodedProbe] PURE #${probeGroupId} | clientGap=${clientGap.toFixed(1)}ms serverGap=${serverGap.toFixed(1)}ms drift=${gapDrift.toFixed(1)}ms | bestRTT=${best.roundTripDelay.toFixed(1)}ms offset=${best.clockOffset.toFixed(1)}ms | pure: ${pureCount}/${total} (${pureRate}%) | sent: ${probeGroupCounter}`
-  );
 
   return best;
 };

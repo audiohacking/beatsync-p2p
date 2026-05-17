@@ -1,4 +1,5 @@
 import { countryCodeEmoji } from "@/lib/country/countryCode";
+import { publicAssetPath } from "@/lib/paths";
 import { LocationSchema, MAX_LOCATION_QUALITY, sanitizeLocationFields, scoreLocationQuality } from "@beatsync/shared";
 import { z } from "zod";
 import { getCountryName } from "./country/codeToName";
@@ -62,7 +63,7 @@ const getFlagSvgURLFromCountryCode = (countryCode: string) => {
     throw new Error(`Country code must be exactly 2 characters, got: ${countryCode}`);
   }
 
-  return `/flags/${countryCode.toLowerCase()}.svg`;
+  return publicAssetPath(`/flags/${countryCode.toLowerCase()}.svg`);
 };
 
 // https://www.geojs.io — Cloudflare-backed, full CORS, no key, unlimited

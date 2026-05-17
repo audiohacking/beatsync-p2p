@@ -2,12 +2,13 @@
 
 import { useBeatTiming } from "@/hooks/useBeatTiming";
 import { audioContextManager } from "@/lib/audioContextManager";
+import { publicAssetPath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { useGlobalStore } from "@/store/global";
 import { Metronome as MetronomeIcon } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
-const KICK_URL = "/kick.wav";
+const KICK_URL = publicAssetPath("/kick.wav");
 
 /** Lazily fetch + decode the kick sample once, then cache it. Clears cache on failure so retries work. */
 let kickBufferPromise: Promise<AudioBuffer> | null = null;
@@ -52,9 +53,13 @@ export const MetronomeButton = () => {
     const ctx = audioContextManager.getContext();
     let cancelled = false;
 
-    getKickBuffer(ctx).then((buffer) => {
-      if (!cancelled) kickBufferRef.current = buffer;
-    });
+    getKickBuffer(ctx)
+      .then((buffer) => {
+        if (!cancelled) kickBufferRef.current = buffer;
+      })
+      .catch(() => {
+        // kick.wav is optional (may be absent on static deploy)
+      });
 
     return () => {
       cancelled = true;

@@ -115,6 +115,13 @@ export const useP2PConnectionStore = create<P2PConnectionState>()((set, get) => 
 
     const broadcastEnvelope = (envelope: P2PEnvelope) => {
       void sendEnvelopeAction(envelope, null);
+      // Trystero does not echo broadcasts to the initiator — apply room events locally.
+      if (envelope.kind !== "broadcast") return;
+      const payload = envelope.payload;
+      if (payload.type === "ROOM_EVENT" && payload.event.type === "CLIENT_CHANGE") {
+        return;
+      }
+      deliverLocalRoomMessage(payload);
     };
 
     const deliverLocalRoomMessage = (message: WSResponseType) => {

@@ -26,12 +26,17 @@ export const uploadAudioFile = async (data: { file: File; roomId: string }) => {
 
   await saveLocalTrack(record);
 
-  useP2PConnectionStore.getState().sendRequest({
+  const p2p = useP2PConnectionStore.getState();
+  if (!p2p.isReady) {
+    throw new Error("Room connection is still starting — try again in a moment");
+  }
+
+  p2p.sendRequest({
     type: ClientActionEnum.enum.REGISTER_AUDIO_SOURCE,
     source: { url },
   });
 
-  const room = useP2PConnectionStore.getState().room;
+  const room = p2p.room;
   if (room) {
     void broadcastLocalTrackToRoom(room, record);
   }
