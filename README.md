@@ -1,8 +1,13 @@
-# Beatsync P2P
+# [Beatsync](https://github.com/freeman-jiang/beatsync) P2P Fork
 
-Ephemeral Synchronized multi-device audio playback in the browser — fully **peer-to-peer** via [Trystero](https://github.com/dmotz/trystero). 
+Ephemeral Synchronized multi-device audio playback in the browser — now 100% **p2p** using [Trystero](https://github.com/dmotz/trystero). 
 
 > Create a room, upload tracks and play in sync. No backend, no cloud storage, no leaks.
+
+### Use Cases
+- Party Mode: Sync all your machines to play in perfect sync all over the place
+- Remote Mode: Listen to your demos and mixes safely while chatting (audio/text)
+
 
 ## Live demo
 
