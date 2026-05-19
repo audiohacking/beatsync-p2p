@@ -2,11 +2,12 @@
 
 Ephemeral Synchronized multi-device audio playback in the browser — now 100% **p2p** using [Trystero](https://github.com/dmotz/trystero). 
 
-> Create a room, upload tracks and play in sync. No backend, no cloud storage, no leaks.
+> Create a room, upload tracks and play in sync. No backend, no cloud storage, no audio leaks.
 
 ### Use Cases
 - Party Mode: Sync all your machines to play in perfect sync all over the place
-- Remote Mode: Listen to your demos and mixes safely while chatting (audio/text)
+- Play Mode: Share and play your demos/mixes safely while chatting _(audio/text)_
+- Your Mode: Just do whatever you want with it, in perfect sync.
 
 
 ## Live demo
