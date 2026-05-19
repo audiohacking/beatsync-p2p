@@ -4,12 +4,6 @@ Ephemeral Synchronized multi-device audio playback in the browser — now 100% *
 
 > Create a room, upload tracks and play in sync. No backend, no cloud storage, no audio leaks.
 
-### Use Cases
-- Party Mode: Sync all your machines to play in perfect sync all over the place
-- Play Mode: Share and play your demos/mixes safely while chatting _(audio/text)_
-- Your Mode: Just do whatever you want with it, in perfect sync.
-
-
 ## Live demo
 
 **[https://audiohacking.github.io/beatsync-p2p](https://audiohacking.github.io/beatsync-p2p)**
@@ -17,6 +11,13 @@ Ephemeral Synchronized multi-device audio playback in the browser — now 100% *
 Open the link, join or create a 6-digit room, and share the URL with others in the same session.
 
 > Demo is hosted on github pages without any backend 🎉
+
+### Use Cases
+- Party Mode: Sync all your machines to play in perfect sync all over the place
+- Play Mode: Share and play your demos/mixes safely while chatting _(audio/text)_
+- Your Mode: Just do whatever you want with it, in perfect sync.
+
+
 
 ## Why P2P?
 
